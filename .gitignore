@@ -1,6 +1,5 @@
 # BMAD runtime/state
 _bmad/
-_bmad-output/
 
 # AI agent skill caches
 .agents/

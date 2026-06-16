@@ -1,0 +1,74 @@
+# generated: 2026-06-16
+# last_updated: 2026-06-16
+# project: the long finger
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: {project-root}/_bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-06-16
+last_updated: 2026-06-16
+project: the long finger
+project_key: NOKEY
+tracking_system: file-system
+story_location: "{project-root}/_bmad-output/implementation-artifacts"
+
+development_status:
+  # Epic 1: Capture, View & Complete Your List
+  epic-1: backlog
+  1-1-monorepo-scaffold-walking-skeleton: backlog
+  1-2-todo-contracts-schema-repository-real-read-path: backlog
+  1-3-design-tokens-typography-foundation: backlog
+  1-4-button-textinput-primitives: backlog
+  1-5-checkbox-liveregion-primitives: backlog
+  1-6-list-view-see-your-tasks: backlog
+  1-7-capture-and-confirm-add-a-task: backlog
+  1-8-complete-uncomplete-a-task: backlog
+  1-9-failed-create-recovery: backlog
+  1-10-unread-error-indicator: backlog
+  1-11-thin-container-deploy: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2: Safe Delete
+  epic-2: backlog
+  2-1-delete-endpoint-mutation: backlog
+  2-2-inline-two-step-delete-affordance: backlog
+  2-3-delete-accessibility-state-race-hardening: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3: Production Readiness & Delivery
+  epic-3: backlog
+  3-1-list-wide-keyboard-navigation: backlog
+  3-2-consolidated-screen-reader-contract: backlog
+  3-3-responsive-forced-colors-reduced-motion-verification: backlog
+  3-4-expanded-ci-quality-gates-wcag-conformance: backlog
+  3-5-hardened-production-deploy: backlog
+  epic-3-retrospective: optional

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PRD Validation: Product Requirement Document (PRD) for the Todo App</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --border: #e7e5e4;
+    --text: #1c1917;
+    --muted: #78716c;
+    --verdict-strong: #16a34a;
+    --verdict-adequate: #65a30d;
+    --verdict-thin: #d97706;
+    --verdict-broken: #dc2626;
+    --sev-low: #64748b;
+    --sev-medium: #ca8a04;
+    --sev-high: #ea580c;
+    --sev-critical: #dc2626;
+    --grade-exc: #16a34a;
+    --grade-good: #65a30d;
+    --grade-fair: #d97706;
+    --grade-poor: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
+  header.report-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .title h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .grade {
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    color: white;
+    font-size: 15px;
+    white-space: nowrap;
+  }
+  .grade-excellent { background: var(--grade-exc); }
+  .grade-good { background: var(--grade-good); }
+  .grade-fair { background: var(--grade-fair); }
+  .grade-poor { background: var(--grade-poor); }
+  .synthesis {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--muted);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+    font-size: 15.5px;
+  }
+  .synthesis p { margin: 0 0 10px; }
+  .synthesis p:last-child { margin-bottom: 0; }
+  .dimension-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .dim-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
+  section.dimension, section.reviewer-section { margin-bottom: 14px; }
+  section.dimension details, section.reviewer-section details {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  section summary {
+    padding: 14px 20px;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  section summary::-webkit-details-marker { display: none; }
+  section summary::before {
+    content: ">";
+    display: inline-block;
+    color: var(--muted);
+    transition: transform 0.15s ease;
+  }
+  section details[open] summary::before { transform: rotate(90deg); }
+  section summary h2 {
+    display: inline;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    flex: 1;
+  }
+  .verdict-pill {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: white;
+  }
+  .verdict-strong { background: var(--verdict-strong); }
+  .verdict-adequate { background: var(--verdict-adequate); }
+  .verdict-thin { background: var(--verdict-thin); }
+  .verdict-broken { background: var(--verdict-broken); }
+  .dim-body { padding: 4px 20px 18px; }
+  .dim-judgment { color: var(--text); font-size: 14.5px; }
+  .dim-judgment p { margin: 0 0 10px; }
+  .findings-list { padding: 0 20px 4px; }
+  article.finding {
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+  }
+  article.finding:first-child { border-top: none; }
+  article.finding header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .badge {
+    font-size: 10.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+  }
+  .badge-sev-low { background: rgba(100, 116, 139, 0.12); color: var(--sev-low); }
+  .badge-sev-medium { background: rgba(202, 138, 4, 0.14); color: var(--sev-medium); }
+  .badge-sev-high { background: rgba(234, 88, 12, 0.14); color: var(--sev-high); }
+  .badge-sev-critical { background: rgba(220, 38, 38, 0.14); color: var(--sev-critical); }
+  .finding-title { margin: 0; font-size: 15px; font-weight: 500; flex: 1; min-width: 200px; }
+  .finding-location { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--muted); }
+  .finding-note, .finding-fix { margin-top: 6px; font-size: 14px; }
+  .finding-fix strong { color: var(--muted); font-weight: 500; }
+  .mechanical {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 24px;
+    font-size: 14px;
+  }
+  .mechanical h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .mechanical ul { margin: 0; padding-left: 20px; }
+  .mechanical li { margin-bottom: 4px; color: var(--text); }
+  footer.report-footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  footer .meta { display: flex; gap: 24px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header class="report-header">
+      <div class="title">
+        <h1>Product Requirement Document (PRD) for the Todo App - Validation Report</h1>
+        <div class="subtitle">docs/prd.md</div>
+      </div>
+      <div class="grade grade-poor">Poor</div>
+    </header>
+
+    <div class="synthesis">
+      <p>The PRD gives a clear high-level product intent for a minimal todo app, and it correctly keeps the MVP scope small. It is not yet decision-ready for UX, architecture, or story creation because it lacks stable functional requirement IDs, acceptance criteria, personas or user journeys, measurable success criteria, explicit API contract expectations, and testable non-functional thresholds. Treat it as a good product brief, not a build-ready PRD.</p>
+    </div>
+
+    <div class="dimension-summary">
+      <div class="dim-card"><div class="dim-name">Decision-readiness</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
+      <div class="dim-card"><div class="dim-name">Substance over theater</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
+      <div class="dim-card"><div class="dim-name">Strategic coherence</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
+      <div class="dim-card"><div class="dim-name">Done-ness clarity</div><div class="dim-verdict" style="color: var(--verdict-broken)">broken</div></div>
+      <div class="dim-card"><div class="dim-name">Scope honesty</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Downstream usability</div><div class="dim-verdict" style="color: var(--verdict-broken)">broken</div></div>
+      <div class="dim-card"><div class="dim-name">Shape fit</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
+    </div>
+
+    <section class="dimension"><details open><summary><h2>Decision-readiness</h2><span class="verdict-pill verdict-thin">thin</span></summary><div class="dim-body"><div class="dim-judgment"><p>The PRD states a sensible direction: build a simple full-stack personal todo application with CRUD, persistence, responsive UI, and no authentication in v1. That is enough to understand the product category, but not enough to make downstream decisions without re-interviewing the product owner.</p><p>The document does not surface trade-offs as decisions. For example, authentication and multi-user support are excluded, but the PRD does not state why that is safe or what constraints must be preserved for later.</p></div></div><div class="findings-list">
+      <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">MVP trade-offs are stated but not justified</h3><span class="finding-location">paragraphs 4 and 6</span></header><div class="finding-note">The PRD excludes authentication, collaboration, priority, deadlines, and notifications, but it does not explain the product or delivery logic behind those omissions.</div><div class="finding-fix"><strong>Fix:</strong> Add a Decisions and Trade-offs or MVP Scope Rationale section that explains why v1 is single-user, task-only, and metadata-light, plus what must remain extensible.</div></article>
+      <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Open product questions are hidden</h3><span class="finding-location">whole document</span></header><div class="finding-note">The PRD has no Open Questions section even though several requirements need confirmation: persistence model, delete behavior, edit support, ordering, filtering, completion visibility, and API error behavior.</div><div class="finding-fix"><strong>Fix:</strong> Add an Open Questions section and separate blockers from safe assumptions.</div></article>
+    </div></details></section>
+
+    <section class="dimension"><details open><summary><h2>Substance over theater</h2><span class="verdict-pill verdict-thin">thin</span></summary><div class="dim-body"><div class="dim-judgment"><p>The content is concise and mostly avoids fake personas or unnecessary sections. Its main weakness is that several claims are generic and not defined with thresholds or observable behavior.</p></div></div><div class="findings-list">
+      <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">NFRs are mostly adjectives, not thresholds</h3><span class="finding-location">paragraphs 3 and 5</span></header><div class="finding-note">Phrases like fast and responsive, feel instantaneous, easy to understand, deploy, and extend, and basic error handling are not verifiable.</div><div class="finding-fix"><strong>Fix:</strong> Convert each NFR into a measurable condition, such as response-time targets, offline/error behavior, supported viewport widths, and persistence expectations across refreshes.</div></article>
+      <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">UX quality language is not operationalized</h3><span class="finding-location">paragraph 3</span></header><div class="finding-note">Visually distinguishable, sensible empty/loading/error states, and polished user experience are directionally correct but underspecified.</div><div class="finding-fix"><strong>Fix:</strong> Add UX requirements for each state and define what must be visible, actionable, or recoverable.</div></article>
+    </div></details></section>
+
+    <section class="dimension"><details open><summary><h2>Strategic coherence</h2><span class="verdict-pill verdict-thin">thin</span></summary><div class="dim-body"><div class="dim-judgment"><p>The PRD has a coherent implied thesis: focus on a reliable core task-management loop and avoid advanced features. The gap is that this thesis is not connected to explicit success metrics, counter-metrics, or prioritization logic.</p></div></div><div class="findings-list">
+      <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Success metrics are qualitative and not testable</h3><span class="finding-location">paragraph 7</span></header><div class="finding-note">The PRD does not define how successful completion without guidance, stability, or clarity will be measured.</div><div class="finding-fix"><strong>Fix:</strong> Add 3-5 measurable success metrics, such as task creation completion rate in usability testing, zero data loss after refresh, supported core flows, and acceptable latency.</div></article>
+      <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">No counter-metrics guard the minimalist scope</h3><span class="finding-location">paragraphs 1, 6, and 7</span></header><div class="finding-note">The PRD values simplicity but does not define what would indicate the app is becoming too complex or too sparse.</div><div class="finding-fix"><strong>Fix:</strong> Add counter-metrics such as avoiding additional required fields, avoiding onboarding, or keeping core task creation to one short interaction.</div></article>
+    </div></details></section>
+
+    <section class="dimension"><details open><summary><h2>Done-ness clarity</h2><span class="verdict-pill verdict-broken">broken</span></summary><div class="dim-body"><div class="dim-judgment"><p>This is the largest blocker. Engineers cannot reliably derive stories or tests because the PRD has no numbered FRs, no acceptance criteria, no API endpoint requirements, and no exact behavior for common todo operations.</p></div></div><div class="findings-list">
+      <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">No stable functional requirements or acceptance criteria</h3><span class="finding-location">whole document</span></header><div class="finding-note">The PRD describes capabilities in prose but does not provide FR IDs or verifiable acceptance conditions.</div><div class="finding-fix"><strong>Fix:</strong> Add a Functional Requirements section with globally numbered IDs for create, list, complete/uncomplete, delete, persist, error handling, responsive UI, and metadata behavior. Add acceptance criteria for each.</div></article>
+      <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Core CRUD behavior is incomplete</h3><span class="finding-location">paragraphs 2 and 4</span></header><div class="finding-note">The frontend capability list omits edit/update, while backend CRUD implies update/edit.</div><div class="finding-fix"><strong>Fix:</strong> Decide whether edit is in MVP. If yes, define edit behavior; if no, change backend language from CRUD to the exact supported operations or mark edit as a non-goal.</div></article>
+      <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Persistence and data model are underdefined</h3><span class="finding-location">paragraphs 2 and 4</span></header><div class="finding-note">The PRD names description, completion status, and creation time, but does not define required fields, validation, ordering, IDs, or durability expectations.</div><div class="finding-fix"><strong>Fix:</strong> Add a data model requirement table or concise field list with validation and ordering rules.</div></article>
+      <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Error and loading states lack acceptance criteria</h3><span class="finding-location">paragraphs 3 and 5</span></header><div class="finding-note">The PRD asks for empty, loading, and error states but does not say when they appear or how users recover.</div><div class="finding-fix"><strong>Fix:</strong> Specify required UI states and API failure handling for create, toggle, delete, and initial load.</div></article>
+    </div></details></section>
+
+    <section class="dimension"><details><summary><h2>Scope honesty</h2><span class="verdict-pill verdict-adequate">adequate</span></summary><div class="dim-body"><div class="dim-judgment"><p>The PRD explicitly excludes advanced features, which is useful and appropriately scoped for a first version. The main gap is that assumptions and unresolved decisions are not marked.</p></div></div><div class="findings-list">
+      <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Future extensibility can silently expand MVP scope</h3><span class="finding-location">paragraph 4</span></header><div class="finding-note">Should not prevent future authentication and multi-user support is reasonable, but without boundaries it may push architecture work beyond the MVP.</div><div class="finding-fix"><strong>Fix:</strong> State the minimum extensibility requirement while deferring authentication and multi-tenant data design.</div></article>
+      <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Non-goals are present but not structured</h3><span class="finding-location">paragraph 6</span></header><div class="finding-note">Exclusions are in prose, which is fine for a brief but weaker for downstream extraction.</div><div class="finding-fix"><strong>Fix:</strong> Convert paragraph 6 into a Non-Goals section with explicit MVP non-goal bullets.</div></article>
+    </div></details></section>
+
+    <section class="dimension"><details open><summary><h2>Downstream usability</h2><span class="verdict-pill verdict-broken">broken</span></summary><div class="dim-body"><div class="dim-judgment"><p>For BMad downstream workflows, this PRD is not extractable enough. There are no FR IDs, UJ IDs, SM IDs, glossary, assumptions index, or cross-references.</p></div></div><div class="findings-list">
+      <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">No requirement IDs for UX, architecture, or story generation</h3><span class="finding-location">whole document</span></header><div class="finding-note">The PRD is prose-only, so downstream artifacts cannot cite stable requirements.</div><div class="finding-fix"><strong>Fix:</strong> Add stable IDs for functional requirements, non-functional requirements, success metrics, and non-goals.</div></article>
+      <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">No user journey for the core task loop</h3><span class="finding-location">paragraphs 2 and 3</span></header><div class="finding-note">The intended session is clear in broad strokes but not narrated as a start-to-finish flow.</div><div class="finding-fix"><strong>Fix:</strong> Add one concise user journey covering initial load, add todo, mark complete, delete, refresh, and error recovery.</div></article>
+      <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">No glossary or domain terms section</h3><span class="finding-location">whole document</span></header><div class="finding-note">Terms like todo, task, completion status, active, completed, and session are used casually.</div><div class="finding-fix"><strong>Fix:</strong> Add a small glossary to keep implementation and UX language consistent.</div></article>
+    </div></details></section>
+
+    <section class="dimension"><details open><summary><h2>Shape fit</h2><span class="verdict-pill verdict-thin">thin</span></summary><div class="dim-body"><div class="dim-judgment"><p>The PRD's low-formality shape fits a hobby or small internal app, and the product does not need a large enterprise PRD. But it is currently shaped more like a product brief than a PRD that feeds implementation.</p></div></div><div class="findings-list">
+      <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">The document is under-formalized for implementation handoff</h3><span class="finding-location">whole document</span></header><div class="finding-note">The current narrative is useful context but not enough for architecture and story creation.</div><div class="finding-fix"><strong>Fix:</strong> Reshape into a compact PRD with sections for Goals, Primary User, Core Journey, Functional Requirements, Data/API Requirements, UX States, NFRs, Non-Goals, Success Metrics, and Open Questions.</div></article>
+      <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">The product does not need heavy persona work</h3><span class="finding-location">whole document</span></header><div class="finding-note">Lack of personas is not a major flaw for a simple solo todo app, but the primary user role should still be named.</div><div class="finding-fix"><strong>Fix:</strong> Add one short Primary user definition rather than a full persona set.</div></article>
+    </div></details></section>
+
+    <div class="mechanical">
+      <h3>Mechanical notes</h3>
+      <ul>
+        <li><code>docs/prd.md</code> has no requirement IDs, success metric IDs, user journey IDs, assumptions index, or glossary.</li>
+        <li>The title says Product Requirement Document; the more common phrase is Product Requirements Document.</li>
+        <li>The backend phrase basic CRUD operations conflicts with the user-facing capability list, which omits edit/update.</li>
+        <li>The document contains no frontmatter or status marker; that is acceptable for the source file, but BMad-generated PRDs usually track draft/final status.</li>
+      </ul>
+    </div>
+
+    <footer class="report-footer">
+      <div class="meta">
+        <span>Rubric: .agents/skills/bmad-prd/assets/prd-validation-checklist.md</span>
+        <span>Generated: 2026-05-24T14:03:35Z</span>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PRD Validation: Todo App PRD</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --border: #e7e5e4;
+    --text: #1c1917;
+    --muted: #78716c;
+    --verdict-strong: #16a34a;
+    --verdict-adequate: #65a30d;
+    --verdict-thin: #d97706;
+    --verdict-broken: #dc2626;
+    --sev-low: #64748b;
+    --sev-medium: #ca8a04;
+    --sev-high: #ea580c;
+    --sev-critical: #dc2626;
+    --grade-exc: #16a34a;
+    --grade-good: #65a30d;
+    --grade-fair: #d97706;
+    --grade-poor: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
+  header.report-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .title h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .grade {
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    color: white;
+    font-size: 15px;
+    white-space: nowrap;
+  }
+  .grade-excellent { background: var(--grade-exc); }
+  .grade-good { background: var(--grade-good); }
+  .grade-fair { background: var(--grade-fair); }
+  .grade-poor { background: var(--grade-poor); }
+  .synthesis {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--muted);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+    font-size: 15.5px;
+  }
+  .synthesis p { margin: 0 0 10px; }
+  .synthesis p:last-child { margin-bottom: 0; }
+  .dimension-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .dim-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
+  section.dimension { margin-bottom: 14px; }
+  section.dimension details {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  section summary {
+    padding: 14px 20px;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  section summary::-webkit-details-marker { display: none; }
+  section summary::before {
+    content: ">";
+    display: inline-block;
+    color: var(--muted);
+    transition: transform 0.15s ease;
+  }
+  section details[open] summary::before { transform: rotate(90deg); }
+  section summary h2 {
+    display: inline;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    flex: 1;
+  }
+  .verdict-pill {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: white;
+  }
+  .verdict-strong { background: var(--verdict-strong); }
+  .verdict-adequate { background: var(--verdict-adequate); }
+  .verdict-thin { background: var(--verdict-thin); }
+  .verdict-broken { background: var(--verdict-broken); }
+  .dim-body { padding: 4px 20px 18px; }
+  .dim-judgment { color: var(--text); font-size: 14.5px; }
+  .dim-judgment p { margin: 0 0 10px; }
+  .findings-list { padding: 0 20px 4px; }
+  article.finding {
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+  }
+  article.finding:first-child { border-top: none; }
+  article.finding header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .badge {
+    font-size: 10.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+  }
+  .badge-sev-low { background: rgba(100, 116, 139, 0.12); color: var(--sev-low); }
+  .badge-sev-medium { background: rgba(202, 138, 4, 0.14); color: var(--sev-medium); }
+  .badge-sev-high { background: rgba(234, 88, 12, 0.14); color: var(--sev-high); }
+  .badge-sev-critical { background: rgba(220, 38, 38, 0.14); color: var(--sev-critical); }
+  .finding-title { margin: 0; font-size: 15px; font-weight: 500; flex: 1; min-width: 200px; }
+  .finding-location { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--muted); }
+  .finding-note, .finding-fix { margin-top: 6px; font-size: 14px; }
+  .finding-fix strong { color: var(--muted); font-weight: 500; }
+  .mechanical {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 24px;
+    font-size: 14px;
+  }
+  .mechanical h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .mechanical ul { margin: 0; padding-left: 20px; }
+  .mechanical li { margin-bottom: 4px; color: var(--text); }
+  footer.report-footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  footer .meta { display: flex; gap: 24px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header class="report-header">
+      <div class="title">
+        <h1>Todo App PRD - Validation Report</h1>
+        <div class="subtitle">docs/prd.md</div>
+      </div>
+      <div class="grade grade-excellent">Excellent</div>
+    </header>
+
+    <div class="synthesis">
+      <p>The updated PRD is now suitable for downstream UX, architecture, story creation, and implementation planning for a small MVP. It has stable IDs, a clear core journey, explicit scope boundaries, testable FR consequences, measurable NFRs, success metrics, and an assumptions index. The remaining work is refinement rather than repair: resolve or deliberately defer a few open questions, tighten API error semantics, and clarify acceptance evidence expectations.</p>
+    </div>
+
+    <div class="dimension-summary">
+      <div class="dim-card"><div class="dim-name">Decision-readiness</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Substance over theater</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Strategic coherence</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Done-ness clarity</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Scope honesty</div><div class="dim-verdict" style="color: var(--verdict-strong)">strong</div></div>
+      <div class="dim-card"><div class="dim-name">Downstream usability</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Shape fit</div><div class="dim-verdict" style="color: var(--verdict-strong)">strong</div></div>
+    </div>
+
+    <section class="dimension"><details><summary><h2>Decision-readiness</h2><span class="verdict-pill verdict-adequate">adequate</span></summary><div class="dim-body"><div class="dim-judgment"><p>The PRD now makes the main product decision explicit: v1 validates a single-user Core Task Loop before introducing accounts, collaboration, due dates, priority, reminders, or notifications. §4 explains the trade-off behind deferring authentication and multi-user support while preserving a small API boundary for future ownership fields.</p><p>The Open Questions in §10 are real and useful. None block product understanding, but several are needed before architecture can be considered final.</p></div></div><div class="findings-list">
+      <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Architecture-facing open questions remain unresolved</h3><span class="finding-location">§10</span></header><div class="finding-note">Persistence technology and deployment target are intentionally open, but architecture cannot finish without decisions on both.</div><div class="finding-fix"><strong>Fix:</strong> Before <code>bmad-create-architecture</code>, answer §10 questions 3 and 5 or mark them as architecture-owned decisions.</div></article>
+      <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Some assumptions could be promoted to decisions</h3><span class="finding-location">§11</span></header><div class="finding-note">Newest-first ordering, 200-character descriptions, and deferred description editing are likely reasonable MVP decisions rather than temporary assumptions.</div><div class="finding-fix"><strong>Fix:</strong> Confirm these assumptions and move them into the relevant FR text or scope rationale.</div></article>
+    </div></details></section>
+
+    <section class="dimension"><details><summary><h2>Substance over theater</h2><span class="verdict-pill verdict-adequate">adequate</span></summary><div class="dim-body"><div class="dim-judgment"><p>The document is compact and mostly earned. It avoids fake persona depth and keeps the product thesis centered on the Core Task Loop. The NFRs are materially improved with verifiable language.</p></div></div><div class="findings-list">
+      <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Performance targets are environment-bound</h3><span class="finding-location">§7 NFR-1 and NFR-2</span></header><div class="finding-note">Normal local development conditions is appropriate for MVP implementation but weak for deployed acceptance.</div><div class="finding-fix"><strong>Fix:</strong> Keep as-is for local MVP or add a deployment-specific performance target once deployment is chosen.</div></article>
+    </div></details></section>
+
+    <section class="dimension"><details><summary><h2>Strategic coherence</h2><span class="verdict-pill verdict-adequate">adequate</span></summary><div class="dim-body"><div class="dim-judgment"><p>The PRD has a clear thesis: deliver a reliable, low-friction single-user task loop before adding complexity. Features, non-goals, and counter-metrics now align with that thesis.</p></div></div><div class="findings-list">
+      <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Usability success is under-specified</h3><span class="finding-location">§9 SM-1</span></header><div class="finding-note">SM-1 says the user completes UJ-1 without guidance, but does not define participant count, observer criteria, or failure threshold.</div><div class="finding-fix"><strong>Fix:</strong> Define a lightweight acceptance method, such as one evaluator completing the flow from a cold start without verbal instruction or intervention.</div></article>
+    </div></details></section>
+
+    <section class="dimension"><details><summary><h2>Done-ness clarity</h2><span class="verdict-pill verdict-adequate">adequate</span></summary><div class="dim-body"><div class="dim-judgment"><p>This is no longer broken. FR-1 through FR-10 are globally numbered, scoped, and paired with testable consequences. The data model is defined in §6, and the API surface is concrete enough for architecture and story creation.</p></div></div><div class="findings-list">
+      <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">API error contract is incomplete</h3><span class="finding-location">§5.6 FR-10 and §5.5 FR-8</span></header><div class="finding-note">The PRD requires validation errors and recoverable UI errors, but does not define API error response shape or behavior for invalid IDs.</div><div class="finding-fix"><strong>Fix:</strong> Add minimal API error expectations: validation error for invalid description, not-found error for unknown IDs, and a consistent error body/message field.</div></article>
+      <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Manual verification expectations could be more concrete</h3><span class="finding-location">§9 SM-3</span></header><div class="finding-note">SM-3 allows tests or manual verification notes but does not say where those notes live.</div><div class="finding-fix"><strong>Fix:</strong> In architecture or implementation planning, define the evidence location for manual verification.</div></article>
+    </div></details></section>
+
+    <section class="dimension"><details><summary><h2>Scope honesty</h2><span class="verdict-pill verdict-strong">strong</span></summary><div class="dim-body"><div class="dim-judgment"><p>The PRD is explicit about what v1 will not do, and the assumptions index prevents inferred decisions from becoming invisible commitments. This is strong enough for the product's MVP scale.</p></div></div><div class="findings-list">
+      <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Filtering appears both as a non-goal and as a future possibility</h3><span class="finding-location">§8 NG-4 and §10 question 4</span></header><div class="finding-note">This is not contradictory, but readers may wonder whether filtering is a known v2 candidate or merely an unresolved visibility policy.</div><div class="finding-fix"><strong>Fix:</strong> Reword §10 question 4 as a future-version question, or leave it for roadmap planning rather than MVP readiness.</div></article>
+    </div></details></section>
+
+    <section class="dimension"><details><summary><h2>Downstream usability</h2><span class="verdict-pill verdict-adequate">adequate</span></summary><div class="dim-body"><div class="dim-judgment"><p>The PRD is now extractable. It has contiguous FR IDs, one UJ, SM IDs, NFR IDs, NG IDs, glossary terms, and an assumptions index. A story author can cite FRs directly, and an architect can source API and persistence constraints from §5.6 and §6.</p></div></div><div class="findings-list">
+      <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">FR-to-UJ mapping is mostly section-level rather than FR-level</h3><span class="finding-location">§5</span></header><div class="finding-note">The feature descriptions cite UJ-1, but individual FR bodies do not consistently repeat the mapping.</div><div class="finding-fix"><strong>Fix:</strong> Optional: add Realizes UJ-1 to each FR that supports the core journey.</div></article>
+      <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">NFR-to-FR traceability is implicit</h3><span class="finding-location">§7</span></header><div class="finding-note">NFRs are useful, but they do not cite the FRs they constrain.</div><div class="finding-fix"><strong>Fix:</strong> Optional: add parenthetical references such as applies to FR-3 through FR-8 for implementation readiness.</div></article>
+    </div></details></section>
+
+    <section class="dimension"><details><summary><h2>Shape fit</h2><span class="verdict-pill verdict-strong">strong</span></summary><div class="dim-body"><div class="dim-judgment"><p>The PRD shape fits the product: compact capability spec, not heavy enterprise process. It includes enough user context and journey detail to support UX while keeping personas appropriately light.</p></div></div><div class="findings-list">
+      <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Draft status should be revisited after open questions are resolved</h3><span class="finding-location">frontmatter</span></header><div class="finding-note">The document is still marked status: draft, which is accurate while §10 remains open.</div><div class="finding-fix"><strong>Fix:</strong> After architecture decisions are made or deferred, update status and updated date as part of finalization.</div></article>
+    </div></details></section>
+
+    <div class="mechanical">
+      <h3>Mechanical notes</h3>
+      <ul>
+        <li>FR IDs are contiguous from FR-1 through FR-10.</li>
+        <li>NG, SM, NFR, and UJ identifiers are present and readable.</li>
+        <li>Assumptions index roundtrip is complete for all inline <code>[ASSUMPTION]</code> tags.</li>
+        <li>Glossary terms are mostly consistent; generic user usage does not create ambiguity.</li>
+      </ul>
+    </div>
+
+    <footer class="report-footer">
+      <div class="meta">
+        <span>Rubric: .agents/skills/bmad-prd/assets/prd-validation-checklist.md</span>
+        <span>Generated: 2026-05-25T00:00:00+01:00</span>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
