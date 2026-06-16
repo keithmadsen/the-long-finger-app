@@ -1,0 +1,2 @@
+# Placeholder — this clean-architecture layer holds no skeleton code yet.
+# Handlers (create/toggle/delete) arrive in Stories 1.7/1.8/2.x; services/domains as needed.

@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Story 1.1 gate set: type-check + the two Vitest projects. Each step fails the
+# build (blocks merge) on failure. Playwright, contrast-regression, axe-core,
+# and bundle-size gates are deliberately deferred until a web build/UI exists
+# (epics.md Notes C.14).
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (all workspaces)
+        run: npm run typecheck
+
+      - name: Unit tests (Vitest)
+        run: npm run test:unit
+
+      - name: Integration tests (Vitest)
+        run: npm run test:integration
