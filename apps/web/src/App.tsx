@@ -1,0 +1,42 @@
+import { useEffect, useState } from 'react'
+
+// Walking-skeleton App: do exactly one thing — fetch GET /todos on mount and
+// render the (empty) result. This proves the full round-trip
+// (browser → Vite proxy → Fastify → repository → SQLite → back), AC 4.
+//
+// A plain fetch is correct here. TanStack Query, hooks, primitives, recipes,
+// and design tokens are Stories 1.3–1.7 — deliberately absent.
+function App() {
+  const [todos, setTodos] = useState<unknown[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    fetch('/todos')
+      .then((res) => {
+        if (!res.ok) throw new Error(`GET /todos failed: ${res.status}`)
+        return res.json()
+      })
+      .then((data: unknown[]) => setTodos(data))
+      .catch((err: unknown) => setError(String(err)))
+      .finally(() => setLoaded(true))
+  }, [])
+
+  return (
+    <main>
+      <h1>The Long Finger</h1>
+      {!loaded && <p>Loading…</p>}
+      {error && <p role="alert">{error}</p>}
+      {loaded && !error && todos.length === 0 && <p>No tasks yet.</p>}
+      {todos.length > 0 && (
+        <ul>
+          {todos.map((_, index) => (
+            <li key={index}>task</li>
+          ))}
+        </ul>
+      )}
+    </main>
+  )
+}
+
+export default App

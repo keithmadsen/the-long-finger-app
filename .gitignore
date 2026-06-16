@@ -7,3 +7,21 @@ _bmad/
 
 # Logs
 *.log
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# SQLite database files
+*.db
+*.db-wal
+*.db-shm
+
+# Environment (keep .env.example tracked)
+.env
+.env.*
+!.env.example
