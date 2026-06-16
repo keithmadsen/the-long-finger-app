@@ -1,6 +1,6 @@
 # Story 1.1: Monorepo scaffold & walking skeleton
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -37,7 +37,7 @@ so that the architecture's wiring (DI, dev proxy, SQLite connection, build, CI) 
   - [x] `npm init` the workspace; install runtime deps `fastify@^5`, `@fastify/awilix`, `awilix`, `better-sqlite3@^12`; dev deps `typescript`, `@types/node`, `@types/better-sqlite3`, `vitest`, `tsx`. [Source: architecture.md#Starter-Template-Evaluation; epics.md#AR-2]
   - [x] Create the clean-arch directory layout so AC 6 passes: `src/{index.ts,server.ts}`, `src/plugins/awilix.ts`, `src/routes/{todos.route.ts,health.route.ts}`, `src/handlers/`, `src/services/`, `src/domains/`, `src/repositories/todo.repository.ts`, `src/db/{connection.ts,schema.ts}`, `src/types/cradle.ts`. Empty layer dirs that hold no skeleton code still get a `.gitkeep` so the structure is inspectable. [Source: architecture.md#Complete-Project-Directory-Structure]
   - [x] `db/connection.ts` — open a `better-sqlite3` connection at `DATABASE_PATH` (real on-disk file). Minimal is fine for the skeleton; **WAL + the full pragma set are refined in Story 1.2.**
-  - [x] `db/schema.ts` — run a **minimal** `CREATE TABLE IF NOT EXISTS todos (id TEXT PRIMARY KEY)` at startup so the skeleton `SELECT` succeeds against a fresh file. *(Resolves implementation-readiness minor item #2: the skeleton reads SQLite before the schema story. The full column set / WAL / pragmas land in Story 1.2 — `CREATE TABLE IF NOT EXISTS` makes that an additive change, not a rewrite.)* [Source: implementation-readiness-report-2026-06-15.md#item-2; architecture.md#Data-Architecture]
+  - [x] `db/schema.ts` — run a **minimal** `CREATE TABLE IF NOT EXISTS todos (id TEXT PRIMARY KEY)` at startup so the skeleton `SELECT` succeeds against a fresh file. *(Resolves implementation-readiness minor item #2: the skeleton reads SQLite before the schema story. The full column set / WAL / pragmas land in Story 1.2, which must explicitly handle transition from this id-only skeleton table because SQLite will not add missing columns through a later `CREATE TABLE IF NOT EXISTS` statement.)* [Source: implementation-readiness-report-2026-06-15.md#item-2; architecture.md#Data-Architecture]
   - [x] `repositories/todo.repository.ts` — factory function `todoRepository({ db })` (named for output, **no `create` prefix**) exposing `listTodos()` that runs `SELECT * FROM todos` and returns the rows. For the skeleton this returns `[]`; the snake↔camel mapper + canonical-order query are Story 1.2. [Source: architecture.md#Naming-Patterns, #Pattern-Examples]
   - [x] `plugins/awilix.ts` — register the cradle via `@fastify/awilix`: register the db connection and `todoRepository` as factories. The DB-file path must be **injectable** (read from config/env, overridable per-construction) so a test can point at a temp file **without swapping the repository implementation** (AC 7, Note A.4).
   - [x] `types/cradle.ts` — declare the `Dependencies` (Awilix Cradle) type.
@@ -63,6 +63,15 @@ so that the architecture's wiring (DI, dev proxy, SQLite connection, build, CI) 
 - [x] **Task 7 — Verify the full round-trip (AC: 1–4)**
   - [x] Run the documented dev commands; confirm both processes start, the proxy works, `GET /health` and `GET /todos` return as specified, and the browser renders the empty result. Confirm data is read from a real on-disk file (delete the file → table re-created empty → still `200 []`).
 
+### Review Findings
+
+- [x] [Review][Patch] Documented `.env` setup is not honored by the API or Vite proxy [README.md:27]
+- [x] [Review][Patch] API startup does not validate invalid or empty environment values [apps/api/src/index.ts:4]
+- [x] [Review][Patch] Schema comments/story notes incorrectly imply `CREATE TABLE IF NOT EXISTS` can add future columns [apps/api/src/db/schema.ts:5]
+- [x] [Review][Patch] Web workspace root `tsconfig.json` does not extend the shared base config [apps/web/tsconfig.json:1]
+- [x] [Review][Patch] Web app trusts `/todos` JSON shape without checking it is an array [apps/web/src/App.tsx:20]
+- [x] [Review][Patch] `apps/web/README.md` still contains generic Vite template guidance [apps/web/README.md:1]
+
 ## Dev Notes
 
 ### Scope guardrail (read first)
@@ -86,7 +95,7 @@ Before writing any backend code, consult the `clean-architecture` skill — the 
 Build the directory shape from architecture.md#Complete-Project-Directory-Structure, but only populate the skeleton slice. Present-but-stubbed: `packages/contracts/src/index.ts`, `apps/api/src/{handlers,services,domains}` (`.gitkeep`). Real in this story: root manifest + `tsconfig.base.json`, `apps/web` (proxy + minimal App), `apps/api` (`server.ts`/`index.ts`/`routes`/`plugins/awilix.ts`/`repositories/todo.repository.ts`/`db/`/`types/cradle.ts`), the two Vitest projects, `ci.yml`. Explicitly deferred: `plugins/{swagger,static,error-handler}.ts`, all command handlers, `apps/web` hooks/primitives/recipes/styles, `playwright.config.ts`, `Dockerfile`.
 
 ### The SQLite-before-schema seam (resolved here)
-Story 1.2 owns the real `todos` schema (full columns, WAL, pragmas, canonical-order query, mapper). But this skeleton must `SELECT` from a real file to satisfy AC 3. The implementation-readiness report flagged this ordering (minor item #2). **Resolution adopted:** the skeleton runs a minimal `CREATE TABLE IF NOT EXISTS todos (id TEXT PRIMARY KEY)` at startup. Because Story 1.2 also uses `CREATE TABLE IF NOT EXISTS`, expanding the column set there is additive — no migration, no rewrite. Do not add `description`/`completed`/timestamps now; that is 1.2's contract work. [Source: implementation-readiness-report-2026-06-15.md#item-2]
+Story 1.2 owns the real `todos` schema (full columns, WAL, pragmas, canonical-order query, mapper). But this skeleton must `SELECT` from a real file to satisfy AC 3. The implementation-readiness report flagged this ordering (minor item #2). **Resolution adopted:** the skeleton runs a minimal `CREATE TABLE IF NOT EXISTS todos (id TEXT PRIMARY KEY)` at startup. Story 1.2 must explicitly handle transition from this id-only table because SQLite will not add missing columns through a later `CREATE TABLE IF NOT EXISTS` statement. Do not add `description`/`completed`/timestamps now; that is 1.2's contract work. [Source: implementation-readiness-report-2026-06-15.md#item-2]
 
 ### Injectable DB path (AC 7) — why it matters now
 Note A.4 makes the injectable DB-file path an architectural AC of the persistence work, and the cheapest honest place to prove it is here. The awilix registration must read the path from config/env and allow a test to construct the repository against a temp-dir file **without** swapping the implementation (no in-memory fake). This is what lets the later FR-9 durability test (Story 1.2: stop process → restart → data persists) be trustworthy. [Source: epics.md#Notes A.4; architecture.md#Data-Architecture]

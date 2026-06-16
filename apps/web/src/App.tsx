@@ -17,7 +17,12 @@ function App() {
         if (!res.ok) throw new Error(`GET /todos failed: ${res.status}`)
         return res.json()
       })
-      .then((data: unknown[]) => setTodos(data))
+      .then((data: unknown) => {
+        if (!Array.isArray(data)) {
+          throw new Error('GET /todos returned an invalid response shape')
+        }
+        setTodos(data)
+      })
       .catch((err: unknown) => setError(String(err)))
       .finally(() => setLoaded(true))
   }, [])

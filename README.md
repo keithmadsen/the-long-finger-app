@@ -24,14 +24,18 @@ This installs every workspace and links them together (no per-workspace install 
 
 ## Configure
 
-Copy the example environment file and adjust if needed:
+The defaults work without any local configuration:
+
+- `PORT` defaults to `3001`, which is also the port the Vite dev proxy targets.
+- `DATABASE_PATH` defaults to `./data/todos.db`, relative to `apps/api`.
+
+To override them, set environment variables in the shell that starts the app:
 
 ```bash
-cp .env.example apps/api/.env
+PORT=3001 DATABASE_PATH=./data/todos.db npm run dev
 ```
 
-- `PORT` — the port the Fastify API listens on (default `3001`).
-- `DATABASE_PATH` — path to the on-disk SQLite file (default `./data/todos.db`, relative to `apps/api`). The directory is created automatically on startup.
+`.env.example` documents the available variables, but the dev scripts do not load `.env` files automatically. Shell environment variables are inherited by both the API and Vite dev server, keeping the API port and proxy target aligned.
 
 ## Run (development)
 
