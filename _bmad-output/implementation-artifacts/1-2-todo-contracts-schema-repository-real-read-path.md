@@ -1,6 +1,10 @@
+---
+baseline_commit: 3089fc762539f03a507f4d3793a07d5b9582a237
+---
+
 # Story 1.2: Todo contracts, schema & repository (real read path)
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -26,18 +30,18 @@ so that both apps share one source of truth and the read path is correct and per
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Author the full `@tlf/contracts` surface (AC: 1)**
-  - [ ] Add `@sinclair/typebox@^0.34.49` as a **dependency** of `packages/contracts/package.json` (verified June 2026; see Latest Tech). The package is consumed as **TypeScript source** (`main`/`types`/`exports` all point at `./src/index.ts`, `tsc --noEmit`) — there is no build artifact, so consumers compile the `.ts` directly. Do not add a build step.
-  - [ ] Create `packages/contracts/src/todo.schema.ts`: define and export `todoSchema`, `createTodoBody`, `patchTodoBody` as `Type.Object(...)` and their derived types `Todo`, `CreateTodoBody`, `PatchTodoBody` via `Static<typeof ...>`. **Export names must match the AC exactly** (`createTodoBody`/`patchTodoBody`, NOT `…Schema` — the AC text is authoritative over the architecture directory comment). [Source: epics.md#Story-1.2]
+- [x] **Task 1 — Author the full `@tlf/contracts` surface (AC: 1)**
+  - [x] Add `@sinclair/typebox@^0.34.49` as a **dependency** of `packages/contracts/package.json` (verified June 2026; see Latest Tech). The package is consumed as **TypeScript source** (`main`/`types`/`exports` all point at `./src/index.ts`, `tsc --noEmit`) — there is no build artifact, so consumers compile the `.ts` directly. Do not add a build step.
+  - [x] Create `packages/contracts/src/todo.schema.ts`: define and export `todoSchema`, `createTodoBody`, `patchTodoBody` as `Type.Object(...)` and their derived types `Todo`, `CreateTodoBody`, `PatchTodoBody` via `Static<typeof ...>`. **Export names must match the AC exactly** (`createTodoBody`/`patchTodoBody`, NOT `…Schema` — the AC text is authoritative over the architecture directory comment). [Source: epics.md#Story-1.2]
     - `todoSchema`: `{ id: string, description: string (minLength 1, maxLength 200), completed: boolean, createdAt: string, updatedAt: string }`. Give it `$id: 'Todo'` so Swagger can register a stable reusable component. `createdAt`/`updatedAt` are ISO-8601 strings. **Do NOT add `format: 'uuid'`/`format: 'date-time'` validation here** — Ajv format keywords need `ajv-formats` registered at the API boundary, which lands with POST validation in Story 1.7. Plain `Type.String()` (with the description length range) is correct for now.
     - `createTodoBody`: `{ id: string, description: string (minLength 1, maxLength 200) }` — client-generated UUIDv7 `id` + the new description. No timestamps, no `completed` (server owns those). [Source: architecture.md#API-&-Communication-Patterns]
     - `patchTodoBody`: `{ completed: boolean }` only — completion is the sole mutable field (NG-7). [Source: architecture.md#API-&-Communication-Patterns]
-  - [ ] Create `packages/contracts/src/error.schema.ts`: export `errorEnvelope` = `{ error: { code: string, message: string, details?: unknown } }` and type `ErrorEnvelope`. Give it `$id: 'ErrorEnvelope'` so Swagger can register a stable reusable component. This is the **one and only** error shape (AR-5), and it is both defined and consumed in this story by the error-handler and OpenAPI responses; later mutation endpoints inherit the same shape. [Source: architecture.md#Format-Patterns; epics.md#Notes-A.2]
-  - [ ] Rewrite `packages/contracts/src/index.ts` as a barrel that re-exports everything from `./todo.schema.js` and `./error.schema.js`. Remove the `CONTRACTS_PACKAGE` placeholder. Use `.js` extension specifiers in relative imports (the package is `"type": "module"` + `NodeNext`). [Source: packages/contracts/tsconfig.json]
-  - [ ] **Prove "importable by both apps" (AC 1):** the API will import `Todo` (repository return type / route). For the web side, type `apps/web/src/App.tsx`'s `todos` state as `Todo[]` instead of `unknown[]` — this is a zero-risk typing change that proves the cross-app import compiles and removes an `unknown`; it is NOT feature work (no rendering change, list UI is Story 1.6). Confirm both `apps/api` and `apps/web` typecheck with the new import. [Source: architecture.md#Architectural-Boundaries — "both apps import from it"]
+  - [x] Create `packages/contracts/src/error.schema.ts`: export `errorEnvelope` = `{ error: { code: string, message: string, details?: unknown } }` and type `ErrorEnvelope`. Give it `$id: 'ErrorEnvelope'` so Swagger can register a stable reusable component. This is the **one and only** error shape (AR-5), and it is both defined and consumed in this story by the error-handler and OpenAPI responses; later mutation endpoints inherit the same shape. [Source: architecture.md#Format-Patterns; epics.md#Notes-A.2]
+  - [x] Rewrite `packages/contracts/src/index.ts` as a barrel that re-exports everything from `./todo.schema.js` and `./error.schema.js`. Remove the `CONTRACTS_PACKAGE` placeholder. Use `.js` extension specifiers in relative imports (the package is `"type": "module"` + `NodeNext`). [Source: packages/contracts/tsconfig.json]
+  - [x] **Prove "importable by both apps" (AC 1):** the API will import `Todo` (repository return type / route). For the web side, type `apps/web/src/App.tsx`'s `todos` state as `Todo[]` instead of `unknown[]` — this is a zero-risk typing change that proves the cross-app import compiles and removes an `unknown`; it is NOT feature work (no rendering change, list UI is Story 1.6). Confirm both `apps/api` and `apps/web` typecheck with the new import. [Source: architecture.md#Architectural-Boundaries — "both apps import from it"]
 
-- [ ] **Task 2 — Real `todos` schema + the skeleton-table migration seam (AC: 2)**
-  - [ ] Rewrite `apps/api/src/db/schema.ts` `applySchema(db)` to create the full table:
+- [x] **Task 2 — Real `todos` schema + the skeleton-table migration seam (AC: 2)**
+  - [x] Rewrite `apps/api/src/db/schema.ts` `applySchema(db)` to create the full table:
     ```sql
     CREATE TABLE IF NOT EXISTS todos (
       id          TEXT PRIMARY KEY,
@@ -47,48 +51,53 @@ so that both apps share one source of truth and the read path is correct and per
       updated_at  TEXT    NOT NULL
     )
     ```
-  - [ ] **Handle the id-only → full-table transition explicitly (critical — see Dev Notes "The skeleton-table migration seam").** Story 1.1 shipped `CREATE TABLE IF NOT EXISTS todos (id TEXT PRIMARY KEY)`. SQLite will **not** add the new columns through `CREATE TABLE IF NOT EXISTS`. Before the `CREATE`, probe `PRAGMA table_info(todos)`; if the table exists **but lacks the `description` column** and its columns are exactly the obsolete skeleton shape (`id` only), `DROP TABLE todos` first, then create the full table. If the table exists with any other unexpected partial shape, throw a clear startup error rather than silently continuing against a corrupt/unknown schema. Do this **only** for the obsolete shape — never drop unconditionally (that would defeat the AC 9 durability test, which writes rows then restarts against the same file). Once the full table exists, the probe finds `description` present and `CREATE TABLE IF NOT EXISTS` is a no-op. [Source: 1-1 story Dev Notes "The SQLite-before-schema seam"; implementation-readiness-report-2026-06-15.md#item-2]
-  - [ ] Add a short comment naming `db/` as the documented migration extension point (AR-3); no migration tool in v1.
+  - [x] **Handle the id-only → full-table transition explicitly (critical — see Dev Notes "The skeleton-table migration seam").** Story 1.1 shipped `CREATE TABLE IF NOT EXISTS todos (id TEXT PRIMARY KEY)`. SQLite will **not** add the new columns through `CREATE TABLE IF NOT EXISTS`. Before the `CREATE`, probe `PRAGMA table_info(todos)`; if the table exists **but lacks the `description` column** and its columns are exactly the obsolete skeleton shape (`id` only), `DROP TABLE todos` first, then create the full table. If the table exists with any other unexpected partial shape, throw a clear startup error rather than silently continuing against a corrupt/unknown schema. Do this **only** for the obsolete shape — never drop unconditionally (that would defeat the AC 9 durability test, which writes rows then restarts against the same file). Once the full table exists, the probe finds `description` present and `CREATE TABLE IF NOT EXISTS` is a no-op. [Source: 1-1 story Dev Notes "The SQLite-before-schema seam"; implementation-readiness-report-2026-06-15.md#item-2]
+  - [x] Add a short comment naming `db/` as the documented migration extension point (AR-3); no migration tool in v1.
 
-- [ ] **Task 3 — WAL + pragmas on the connection (AC: 2)**
-  - [ ] In `apps/api/src/db/connection.ts`, after opening the `Database` and **before** `applySchema`, set the pragma set via `db.pragma(...)`:
+- [x] **Task 3 — WAL + pragmas on the connection (AC: 2)**
+  - [x] In `apps/api/src/db/connection.ts`, after opening the `Database` and **before** `applySchema`, set the pragma set via `db.pragma(...)`:
     - `journal_mode = WAL` — concurrent reads during a write; this setting persists in the DB file.
     - `synchronous = NORMAL` — safe from corruption under WAL, faster than FULL (better-sqlite3 even defaults WAL to NORMAL). [Source: Latest Tech]
     - `busy_timeout = 5000` — wait out transient locks instead of erroring.
     - `foreign_keys = ON` — integrity baseline (off by default); cheap to set even though v1 has no FKs.
     - The cache_size / mmap_size / temp_store perf-tuning pragmas are **optional** and not required by any AC — skip unless trivially added; keep the connection minimal for a single-user MVP.
-  - [ ] Use `db.pragma('journal_mode = WAL')` (better-sqlite3's pragma API), not `db.exec`. Confirm WAL took effect (e.g. `db.pragma('journal_mode', { simple: true })` returns `'wal'`) in the connection unit/integration coverage.
+  - [x] Use `db.pragma('journal_mode = WAL')` (better-sqlite3's pragma API), not `db.exec`. Confirm WAL took effect (e.g. `db.pragma('journal_mode', { simple: true })` returns `'wal'`) in the connection unit/integration coverage.
 
-- [ ] **Task 4 — Repository: canonical list, mapper, idempotent insert, timestamps (AC: 3, 4, 7, 8)**
-  - [ ] In `apps/api/src/repositories/todo.repository.ts`, replace the raw `SELECT * FROM todos` skeleton with the real surface. The repository stays the **only** module importing `better-sqlite3` knowledge or touching snake_case. [Source: architecture.md#Architectural-Boundaries]
-  - [ ] Add a private `toDomain(row)` mapper — the **single** place casing crosses over and `completed` is coerced: `{ id, description, completed: !!row.completed, createdAt: row.created_at, updatedAt: row.updated_at }`. No mapping logic anywhere else (AC 4). [Source: architecture.md#Pattern-Examples line 310-313]
-  - [ ] `listTodos(): Todo[]` — `SELECT * FROM todos ORDER BY completed ASC, updated_at DESC`, map each row via `toDomain`, return `Todo[]`. This is the canonical-order authority; the frontend render and any domain helper are derivative and must not re-sort (AC 3). [Source: epics.md#Notes-A.6; architecture.md#Process-Patterns]
-  - [ ] `insertTodo(input: CreateTodoBody): Todo` — **build it now; it is needed for AC 7, AC 8, and to write rows in the AC 9 durability test.** Server stamps `created_at` and `updated_at` to the same `new Date().toISOString()` value; `completed` starts `0`. Any client-supplied timestamp is ignored because `CreateTodoBody` is exactly `{ id, description }`, so there is no field to leak. Idempotent on `id`: `INSERT INTO todos (...) VALUES (...) ON CONFLICT(id) DO NOTHING`, then `SELECT` the row by `id` and return it mapped — so a duplicate insert returns the **existing** row, no second row, no throw (AC 8). [Source: architecture.md#Process-Patterns line 299-301]
-  - [ ] **Scope guard:** build the repository methods and unit-test them, but do **NOT** wire `POST`/`PATCH`/`DELETE` routes or handlers — those are Stories 1.7 / 1.8 / 2.x. (Swagger + the error-handler ARE in scope — Tasks 6–7.) The endpoint-level idempotency/timestamp contract (200-with-existing-Todo) is asserted in Story 1.7; here it is a repository unit guarantee. [Source: epics.md#Story-1.2 AC 8; #Notes-B.9]
+- [x] **Task 4 — Repository: canonical list, mapper, idempotent insert, timestamps (AC: 3, 4, 7, 8)**
+  - [x] In `apps/api/src/repositories/todo.repository.ts`, replace the raw `SELECT * FROM todos` skeleton with the real surface. The repository stays the **only** module importing `better-sqlite3` knowledge or touching snake_case. [Source: architecture.md#Architectural-Boundaries]
+  - [x] Add a private `toDomain(row)` mapper — the **single** place casing crosses over and `completed` is coerced: `{ id, description, completed: !!row.completed, createdAt: row.created_at, updatedAt: row.updated_at }`. No mapping logic anywhere else (AC 4). [Source: architecture.md#Pattern-Examples line 310-313]
+  - [x] `listTodos(): Todo[]` — `SELECT * FROM todos ORDER BY completed ASC, updated_at DESC`, map each row via `toDomain`, return `Todo[]`. This is the canonical-order authority; the frontend render and any domain helper are derivative and must not re-sort (AC 3). [Source: epics.md#Notes-A.6; architecture.md#Process-Patterns]
+  - [x] `insertTodo(input: CreateTodoBody): Todo` — **build it now; it is needed for AC 7, AC 8, and to write rows in the AC 9 durability test.** Server stamps `created_at` and `updated_at` to the same `new Date().toISOString()` value; `completed` starts `0`. Any client-supplied timestamp is ignored because `CreateTodoBody` is exactly `{ id, description }`, so there is no field to leak. Idempotent on `id`: `INSERT INTO todos (...) VALUES (...) ON CONFLICT(id) DO NOTHING`, then `SELECT` the row by `id` and return it mapped — so a duplicate insert returns the **existing** row, no second row, no throw (AC 8). [Source: architecture.md#Process-Patterns line 299-301]
+  - [x] **Scope guard:** build the repository methods and unit-test them, but do **NOT** wire `POST`/`PATCH`/`DELETE` routes or handlers — those are Stories 1.7 / 1.8 / 2.x. (Swagger + the error-handler ARE in scope — Tasks 6–7.) The endpoint-level idempotency/timestamp contract (200-with-existing-Todo) is asserted in Story 1.7; here it is a repository unit guarantee. [Source: epics.md#Story-1.2 AC 8; #Notes-B.9]
 
-- [ ] **Task 5 — `GET /todos` returns canonical camelCase Todo[] with a typed response schema (AC: 5, 10)**
-  - [ ] `apps/api/src/routes/todos.route.ts` already resolves `todoRepository` from the cradle and returns `listTodos()`. Because the repository now returns mapped, ordered `Todo[]`, the handler body is unchanged — keep it thin (no logic, no DB knowledge, no envelope). Verify the JSON is camelCase and a bare array (no `{ data: ... }`). [Source: architecture.md#Format-Patterns]
-  - [ ] Attach the response schema: declare `GET /todos` with `response: { 200: Type.Array(todoSchema) }` so Fastify serializes/validates output against the contract and Swagger can document it. Wire `@fastify/type-provider-typebox@5.2.0` on the instance (`.withTypeProvider<TypeBoxTypeProvider>()`) so the route is typed from the schema. **Caution (Fastify v5):** the type provider split validator/serializer schemas — use the v5-compatible `5.2.0` package because it peers on `@sinclair/typebox >=0.26 <=0.34`; do not install `6.x`, which peers on the different `typebox@^1` package. Response serialization **strips any field not in `todoSchema`**, so the mapper output must match the schema exactly (it does: `id, description, completed, createdAt, updatedAt`). [Source: Latest Tech; architecture.md#API-&-Communication-Patterns]
+- [x] **Task 5 — `GET /todos` returns canonical camelCase Todo[] with a typed response schema (AC: 5, 10)**
+  - [x] `apps/api/src/routes/todos.route.ts` already resolves `todoRepository` from the cradle and returns `listTodos()`. Because the repository now returns mapped, ordered `Todo[]`, the handler body is unchanged — keep it thin (no logic, no DB knowledge, no envelope). Verify the JSON is camelCase and a bare array (no `{ data: ... }`). [Source: architecture.md#Format-Patterns]
+  - [x] Attach the response schema: declare `GET /todos` with `response: { 200: Type.Array(todoSchema) }` so Fastify serializes/validates output against the contract and Swagger can document it. Wire `@fastify/type-provider-typebox@5.2.0` on the instance (`.withTypeProvider<TypeBoxTypeProvider>()`) so the route is typed from the schema. **Caution (Fastify v5):** the type provider split validator/serializer schemas — use the v5-compatible `5.2.0` package because it peers on `@sinclair/typebox >=0.26 <=0.34`; do not install `6.x`, which peers on the different `typebox@^1` package. Response serialization **strips any field not in `todoSchema`**, so the mapper output must match the schema exactly (it does: `id, description, completed, createdAt, updatedAt`). [Source: Latest Tech; architecture.md#API-&-Communication-Patterns]
 
-- [ ] **Task 6 — Error-handler plugin: uniform error envelope (AC: 11)**
-  - [ ] Create `apps/api/src/plugins/error-handler.ts`: a plugin calling `app.setErrorHandler(...)` + `app.setNotFoundHandler(...)` to emit the `errorEnvelope` shape from `@tlf/contracts` — `{ error: { code, message, details? } }` — on every non-2xx. Map: validation → 400 with field `details` (wired-but-dormant until a 4xx endpoint exists in 1.7), not-found → 404, else → 500. Log via the existing pino logger; never leak stack traces or payloads in the response body. [Source: architecture.md#Format-Patterns, #Process-Patterns lines 297-305; epics.md#Notes-A.2]
-  - [ ] Register the plugin in `server.ts`'s `buildServer()` so it is active for both the live app and tests. Keep it thin — status→envelope mapping is the only logic. The **domain** 404 for *PATCH on a missing id* is owned by the create/toggle handlers later (architecture: "404 mapping lives in the handler orchestration"); this plugin owns only the *transport-level* envelope shape, not domain 404 decisions. [Source: architecture.md#Process-Patterns line 297]
+- [x] **Task 6 — Error-handler plugin: uniform error envelope (AC: 11)**
+  - [x] Create `apps/api/src/plugins/error-handler.ts`: a plugin calling `app.setErrorHandler(...)` + `app.setNotFoundHandler(...)` to emit the `errorEnvelope` shape from `@tlf/contracts` — `{ error: { code, message, details? } }` — on every non-2xx. Map: validation → 400 with field `details` (wired-but-dormant until a 4xx endpoint exists in 1.7), not-found → 404, else → 500. Log via the existing pino logger; never leak stack traces or payloads in the response body. [Source: architecture.md#Format-Patterns, #Process-Patterns lines 297-305; epics.md#Notes-A.2]
+  - [x] Register the plugin in `server.ts`'s `buildServer()` so it is active for both the live app and tests. Keep it thin — status→envelope mapping is the only logic. The **domain** 404 for *PATCH on a missing id* is owned by the create/toggle handlers later (architecture: "404 mapping lives in the handler orchestration"); this plugin owns only the *transport-level* envelope shape, not domain 404 decisions. [Source: architecture.md#Process-Patterns line 297]
 
-- [ ] **Task 7 — Swagger plugin: OpenAPI from TypeBox (AC: 10)**
-  - [ ] Add deps to `apps/api/package.json`: `@fastify/swagger@^9.7.0`, `@fastify/swagger-ui@^5.2.3`, `@fastify/type-provider-typebox@5.2.0`. These are the verified Fastify-5-compatible versions for the selected `@sinclair/typebox@0.34.x` line; do not use `@fastify/type-provider-typebox@6.x` because it peers on the different `typebox@^1` package, and do not drift Swagger UI to a new major inside this story. [Source: Latest Tech]
-  - [ ] Create `apps/api/src/plugins/swagger.ts`: register `@fastify/swagger` (OpenAPI 3 doc from route schemas) + optionally `@fastify/swagger-ui` (e.g. served at `/docs` in dev). Register schemas by their `$id` values (`Todo`, `ErrorEnvelope`) so `todoSchema`/`errorEnvelope` appear as reusable components. Register **before** routes in `buildServer()` so route schemas are captured. [Source: architecture.md#API-&-Communication-Patterns; #Complete-Project-Directory-Structure line 362]
-  - [ ] Reference `errorEnvelope` as the error response on `GET /todos` so the OpenAPI doc and the Task-6 runtime behavior agree.
+- [x] **Task 7 — Swagger plugin: OpenAPI from TypeBox (AC: 10)**
+  - [x] Add deps to `apps/api/package.json`: `@fastify/swagger@^9.7.0`, `@fastify/swagger-ui@^5.2.3`, `@fastify/type-provider-typebox@5.2.0`. These are the verified Fastify-5-compatible versions for the selected `@sinclair/typebox@0.34.x` line; do not use `@fastify/type-provider-typebox@6.x` because it peers on the different `typebox@^1` package, and do not drift Swagger UI to a new major inside this story. [Source: Latest Tech]
+  - [x] Create `apps/api/src/plugins/swagger.ts`: register `@fastify/swagger` (OpenAPI 3 doc from route schemas) + optionally `@fastify/swagger-ui` (e.g. served at `/docs` in dev). Register schemas by their `$id` values (`Todo`, `ErrorEnvelope`) so `todoSchema`/`errorEnvelope` appear as reusable components. Register **before** routes in `buildServer()` so route schemas are captured. [Source: architecture.md#API-&-Communication-Patterns; #Complete-Project-Directory-Structure line 362]
+  - [x] Reference `errorEnvelope` as the error response on `GET /todos` so the OpenAPI doc and the Task-6 runtime behavior agree.
 
-- [ ] **Task 8 — Tests (AC: 3, 4, 6, 7, 8, 9, 10, 11)**
-  - [ ] **Unit** (`apps/api/src/repositories/todo.repository.test.ts`, co-located): build a repository against an in-process or temp-file DB and assert: canonical ordering with mixed `completed`/`updated_at` fixtures (AC 3); `toDomain` output is camelCase with `completed` as a real boolean and no snake_case keys (AC 4); `insertTodo` stamps `created_at`==`updated_at` and ignores absent client timestamps (AC 7); inserting an existing `id` returns the existing row and leaves the row count unchanged (AC 8). The Story 1.1 trivial unit test in this file should be replaced by these real assertions.
-  - [ ] **Integration** (`apps/api/test/integration/todos.routes.test.ts`, extend the existing file): seed rows via the repository, `GET /todos` → `200`, assert the body is canonically ordered camelCase JSON, an array with no envelope (AC 5). Continue building the app via the existing `buildServer({ databasePath })` helper against a **real temp-file** path — do not swap the implementation or use in-memory (AC 6). [Source: apps/api/test/integration/helpers/build-test-app.ts]
-  - [ ] **Durability integration test (AC 9 — new):** build the app against a temp-file path, `insertTodo` one or more rows, `await app.close()` (this disposes the awilix cradle → `db.close()` → WAL checkpoint; the handle is closed so no in-process cache serves the read), then build a **fresh** app against the **same** path and `GET /todos` → the rows are present. Assert the file is a real on-disk file, not `:memory:`. [Source: architecture.md#Infrastructure-&-Deployment; epics.md#Notes-A.4]
-  - [ ] **OpenAPI assertion (AC 10):** assert the generated OpenAPI doc is reachable (e.g. `app.swagger()` returns a document, or `GET /docs/json` → 200) and that it includes the `GET /todos` path with a `Todo[]` response component. Keep it light — existence + the todos path, not a full snapshot.
-  - [ ] **Error-envelope assertion (AC 11):** register a throwing test-only route (or hit an unknown path) and assert the response body is exactly `{ error: { code, message } }` with the right status (500 / 404). This proves the handler in-epic before any real 4xx exists.
-  - [ ] Keep the two Vitest projects (`unit`, `integration`) green; this story adds no new CI gates (token-lint/axe/Playwright/bundle remain deferred per Notes C.14). [Source: epics.md#Notes-C.14]
+- [x] **Task 8 — Tests (AC: 3, 4, 6, 7, 8, 9, 10, 11)**
+  - [x] **Unit** (`apps/api/src/repositories/todo.repository.test.ts`, co-located): build a repository against an in-process or temp-file DB and assert: canonical ordering with mixed `completed`/`updated_at` fixtures (AC 3); `toDomain` output is camelCase with `completed` as a real boolean and no snake_case keys (AC 4); `insertTodo` stamps `created_at`==`updated_at` and ignores absent client timestamps (AC 7); inserting an existing `id` returns the existing row and leaves the row count unchanged (AC 8). The Story 1.1 trivial unit test in this file should be replaced by these real assertions.
+  - [x] **Integration** (`apps/api/test/integration/todos.routes.test.ts`, extend the existing file): seed rows via the repository, `GET /todos` → `200`, assert the body is canonically ordered camelCase JSON, an array with no envelope (AC 5). Continue building the app via the existing `buildServer({ databasePath })` helper against a **real temp-file** path — do not swap the implementation or use in-memory (AC 6). [Source: apps/api/test/integration/helpers/build-test-app.ts]
+  - [x] **Durability integration test (AC 9 — new):** build the app against a temp-file path, `insertTodo` one or more rows, `await app.close()` (this disposes the awilix cradle → `db.close()` → WAL checkpoint; the handle is closed so no in-process cache serves the read), then build a **fresh** app against the **same** path and `GET /todos` → the rows are present. Assert the file is a real on-disk file, not `:memory:`. [Source: architecture.md#Infrastructure-&-Deployment; epics.md#Notes-A.4]
+  - [x] **OpenAPI assertion (AC 10):** assert the generated OpenAPI doc is reachable (e.g. `app.swagger()` returns a document, or `GET /docs/json` → 200) and that it includes the `GET /todos` path with a `Todo[]` response component. Keep it light — existence + the todos path, not a full snapshot.
+  - [x] **Error-envelope assertion (AC 11):** register a throwing test-only route (or hit an unknown path) and assert the response body is exactly `{ error: { code, message } }` with the right status (500 / 404). This proves the handler in-epic before any real 4xx exists.
+  - [x] Keep the two Vitest projects (`unit`, `integration`) green; this story adds no new CI gates (token-lint/axe/Playwright/bundle remain deferred per Notes C.14). [Source: epics.md#Notes-C.14]
 
-- [ ] **Task 9 — Verify the read path + contract end-to-end**
-  - [ ] Run typecheck across all workspaces (contracts, api, web), both Vitest projects, a live `GET /todos` against a seeded DB (canonical order, camelCase, durability across a real process restart), and confirm the OpenAPI doc renders (`/docs`) and a forced error returns the envelope.
+- [x] **Task 9 — Verify the read path + contract end-to-end**
+  - [x] Run typecheck across all workspaces (contracts, api, web), both Vitest projects, a live `GET /todos` against a seeded DB (canonical order, camelCase, durability across a real process restart), and confirm the OpenAPI doc renders (`/docs`) and a forced error returns the envelope.
+
+### Review Findings
+
+- [ ] [Review][Patch] Partial existing `todos` schemas with `description` are accepted instead of rejected [apps/api/src/db/schema.ts:35]
+- [ ] [Review][Patch] Error handler trusts out-of-range `error.statusCode` values [apps/api/src/plugins/error-handler.ts:32]
 
 ## Dev Notes
 
@@ -156,6 +165,8 @@ The architecture was amended (frontmatter `amendmentNote`, 2026-06-15) from opti
 
 ### Agent Model Used
 
+claude-opus-4-8[1m] (Opus 4.8, 1M context) — dev-story workflow.
+
 ### Latest Tech Information (verified June 2026)
 - **Dependency pins for this story** — use exactly this compatible set: `@sinclair/typebox@^0.34.49`, `@fastify/swagger@^9.7.0`, `@fastify/swagger-ui@^5.2.3`, `@fastify/type-provider-typebox@5.2.0`. `@fastify/type-provider-typebox@5.2.0` peers on `@sinclair/typebox >=0.26 <=0.34`; `6.x` peers on the different `typebox@^1` package and is not the right line for this story.
 - **`@sinclair/typebox`** — latest compatible `0.34.49` (published 2026-03-28). Import shape: `import { Type, type Static } from '@sinclair/typebox'`; define with `Type.Object({...})`, derive types with `Static<typeof Schema>`.
@@ -164,9 +175,48 @@ The architecture was amended (frontmatter `amendmentNote`, 2026-06-15) from opti
 
 ### Debug Log References
 
+- Typecheck (first pass) failed in `plugins/error-handler.ts`: Fastify v5 types the `setErrorHandler` callback's `error` as `unknown`. Fixed by annotating the param `error: FastifyError`.
+- Integration AC-10 (first pass) failed: `@fastify/swagger` named the `addSchema`'d components `def-0`/`def-1` instead of `Todo`/`ErrorEnvelope`. Fixed by adding a `refResolver.buildLocalReference` that returns each schema's `$id`.
+
 ### Completion Notes List
 
+- **All 11 ACs satisfied.** Read path is correct, durable, and observable: `GET /todos` returns the canonically-ordered (`completed ASC, updated_at DESC`) camelCase `Todo[]` as a bare array; rows survive a real process restart (handle closed → WAL checkpoint → fresh app, same file); OpenAPI is generated from the TypeBox schemas; a single `setErrorHandler`/`setNotFoundHandler` emits the uniform `errorEnvelope` on every non-2xx.
+- **Contract surface (AC 1):** `@tlf/contracts` exports `todoSchema` (`$id: 'Todo'`), `createTodoBody`, `patchTodoBody`, `errorEnvelope` (`$id: 'ErrorEnvelope'`) + derived types, consumed as TS source (no build step). Cross-app import proven by re-typing `apps/web/src/App.tsx` `todos` state to `Todo[]` (no rendering change). No `format` keywords yet (Ajv `ajv-formats` lands with POST validation in 1.7).
+- **Migration seam (AC 2):** `applySchema` probes `PRAGMA table_info(todos)` and drops+recreates ONLY the obsolete id-only skeleton; it throws on any other unexpected partial shape and never drops the full table (so the AC-9 durability rows survive). Added an explicit unit test for the throw path and the no-unconditional-drop guard.
+- **Repository boundary (AC 4):** the `toDomain` mapper (snake_case→camelCase + `completed` 0/1→boolean) is the single crossover point; no casing/coercion leaks elsewhere. `insertTodo` stamps `created_at`==`updated_at` server-side and is idempotent on `id` via `ON CONFLICT(id) DO NOTHING` then re-select.
+- **Swagger/error-handler pulled forward (per the story decision):** both registered on the root app inside `buildServer()` — `registerSwagger` is called before routes (it collects schemas via `onRoute`); `registerErrorHandler` is installed on the root instance so it covers every route (including the ATDD/test force-500 route registered on the app directly).
+- **ATDD scaffolds promoted:** the red-phase `test.skip()` scaffolds (`todo.repository.atdd.test.ts`, `todos.atdd.test.ts`) were realized into the canonical, co-located test homes named by Task 8 and then removed to avoid duplicate/dead skipped tests. Unit assertions were split by module for proper co-location: repository → `src/repositories/todo.repository.test.ts` (replaces the 1.1 trivial test, + contract-surface check); schema/migration → `src/db/schema.test.ts`; pragmas → `src/db/connection.test.ts`. Integration scenarios (canonical/camelCase/no-envelope, durability, OpenAPI, error-envelope) were folded into `test/integration/todos.routes.test.ts`. The integration canonical-order test seeds via the cradle `db` with controlled timestamps to stay deterministic (server-stamped inserts can collide on the millisecond). `apps/api/test/fixtures/todo.factory.ts` is retained but no longer referenced; left in place for later stories.
+- **`types/cradle.ts` needed no edit** — `todoRepository`'s type widened to include `insertTodo` automatically via `ReturnType<typeof todoRepository>`.
+- **No new CI gates** added (per Notes C.14). Verified: all-workspace `typecheck` green; Vitest `unit` (11 tests, 3 files) + `integration` (7 tests) green; live boot smoke test — `GET /todos` → `[]`, `/docs` → 200, `/docs/json` components = `Todo`,`ErrorEnvelope`, unknown route → 404 envelope.
+- **Engine note:** local Node is v22.20.0 while the repo declares `engines.node >=24` (pre-existing `EBADENGINE` warning); all tooling ran fine.
+
 ### File List
+
+**Created**
+- `packages/contracts/src/todo.schema.ts`
+- `packages/contracts/src/error.schema.ts`
+- `apps/api/src/plugins/error-handler.ts`
+- `apps/api/src/plugins/swagger.ts`
+- `apps/api/src/db/schema.test.ts`
+- `apps/api/src/db/connection.test.ts`
+
+**Modified**
+- `packages/contracts/package.json` (added `@sinclair/typebox` dependency)
+- `packages/contracts/src/index.ts` (barrel re-export; removed `CONTRACTS_PACKAGE` placeholder)
+- `apps/api/package.json` (added `@fastify/swagger`, `@fastify/swagger-ui`, `@fastify/type-provider-typebox`, `@sinclair/typebox`)
+- `apps/api/src/db/schema.ts` (full `todos` table + skeleton-migration seam)
+- `apps/api/src/db/connection.ts` (WAL + pragma set before `applySchema`)
+- `apps/api/src/repositories/todo.repository.ts` (`toDomain` mapper, canonical `listTodos`, idempotent `insertTodo`)
+- `apps/api/src/routes/todos.route.ts` (typed `Todo[]` response schema via the TypeBox type provider)
+- `apps/api/src/server.ts` (register swagger before routes + error-handler)
+- `apps/api/src/repositories/todo.repository.test.ts` (real repository + contract-surface unit suite)
+- `apps/api/test/integration/todos.routes.test.ts` (canonical read, durability, OpenAPI, error-envelope)
+- `apps/web/src/App.tsx` (re-typed `todos` state to `Todo[]` — cross-app import proof)
+- `package-lock.json` (new dependencies)
+
+**Deleted**
+- `apps/api/src/repositories/todo.repository.atdd.test.ts` (red-phase scaffold; promoted into canonical files)
+- `apps/api/test/integration/todos.atdd.test.ts` (red-phase scaffold; promoted into canonical files)
 
 ## References
 
@@ -188,3 +238,4 @@ The architecture was amended (frontmatter `amendmentNote`, 2026-06-15) from opti
 | Date       | Change                                                                 |
 |------------|------------------------------------------------------------------------|
 | 2026-06-16 | Story 1.2 created — comprehensive context engine analysis; status → ready-for-dev. |
+| 2026-06-17 | Implemented Tasks 1–9: full `@tlf/contracts` surface, real `todos` schema + migration seam, WAL/pragmas, repository (canonical list, mapper, idempotent insert, server timestamps), typed `GET /todos`, FR-9 durability, `@fastify/swagger` OpenAPI, uniform `errorEnvelope` handler. ATDD scaffolds promoted into canonical co-located tests. typecheck + Vitest unit/integration green. Status → review. |
