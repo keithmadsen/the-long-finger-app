@@ -92,6 +92,13 @@ so that both apps share one source of truth and the read path is correct and per
 
 ## Dev Notes
 
+### ATDD Artifacts
+- Checklist: `_bmad-output/test-artifacts/atdd-checklist-1-2-todo-contracts-schema-repository-real-read-path.md`
+- API/unit scaffolds: `apps/api/src/repositories/todo.repository.atdd.test.ts`
+- API/integration scaffolds: `apps/api/test/integration/todos.atdd.test.ts`
+- Test fixtures: `apps/api/test/fixtures/todo.factory.ts`
+- TDD phase: red; generated scenarios are intentionally skipped with `test.skip()` until the matching implementation task is activated.
+
 ### Scope guardrail (read first)
 This story owns the **read path and the full shared contract — all three legs of AR-4** (TS types, runtime validation, OpenAPI). Deliverables: (1) the complete `@tlf/contracts` TypeBox surface, (2) the real `todos` schema + WAL/pragmas, (3) the repository (canonical list, mapper, idempotent insert, server timestamps), (4) `GET /todos` returning canonical camelCase `Todo[]` with a typed response schema, (5) the FR-9 durability proof, (6) `@fastify/swagger` generating the OpenAPI doc from the TypeBox schemas, (7) the `setErrorHandler` plugin emitting the uniform `errorEnvelope`. **Explicitly NOT in scope:** POST/PATCH/DELETE routes & handlers, TanStack Query, design tokens, primitives, any list/capture UI. Those are Stories 1.3–1.11 / 2.x. The biggest failure mode is over-building the mutation/UI layers — do NOT add command handlers or feature UI. The cross-cutting contract plumbing (Swagger + error-handler) is pulled forward **deliberately** so the mutation stories inherit working machinery (same philosophy as the walking skeleton: stand up plumbing in isolation). When in doubt on the *feature* surface, do less — but the read path + contract must be *correct, durable, and observable*.
 
