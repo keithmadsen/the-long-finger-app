@@ -1,7 +1,7 @@
 // @tlf/contracts — single source of truth for the API contract.
 //
-// Story 1.1 (walking skeleton) ships only this buildable placeholder so the
-// workspace wiring is provable end-to-end. The real contract surface — the
-// TypeBox schemas (`todoSchema`, `createTodoBody`, `patchTodoBody`,
-// `errorEnvelope`) and their derived types — is authored in Story 1.2.
-export const CONTRACTS_PACKAGE = '@tlf/contracts' as const;
+// Consumed as TypeScript source (no build step): package.json `main`/`types`/
+// `exports` all point at this file, so both apps compile the `.ts` directly.
+// `.js` specifiers below are required by the package's NodeNext resolution.
+export * from './todo.schema.js';
+export * from './error.schema.js';

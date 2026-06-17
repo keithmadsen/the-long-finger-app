@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { Todo } from '@tlf/contracts'
 
 // Walking-skeleton App: do exactly one thing — fetch GET /todos on mount and
 // render the (empty) result. This proves the full round-trip
@@ -7,7 +8,9 @@ import { useEffect, useState } from 'react'
 // A plain fetch is correct here. TanStack Query, hooks, primitives, recipes,
 // and design tokens are Stories 1.3–1.7 — deliberately absent.
 function App() {
-  const [todos, setTodos] = useState<unknown[]>([])
+  // Typed from the shared contract to prove the cross-app import compiles
+  // (Story 1.2, AC 1). Rendering stays skeleton-thin — the list UI is Story 1.6.
+  const [todos, setTodos] = useState<Todo[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
 
