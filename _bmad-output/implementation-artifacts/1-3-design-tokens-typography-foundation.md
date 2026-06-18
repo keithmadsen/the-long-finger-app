@@ -4,7 +4,7 @@ baseline_commit: d14b6b321ba0dba610b6e8ba928d1294a6d1588a
 
 # Story 1.3: Design tokens & typography foundation
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -58,6 +58,13 @@ so that every component draws from one calm visual vocabulary and color/focus re
 - [x] **Task 7 — Prove the lint actually gates (red fixtures) (AC: #3)**
   - [x] Add fixture-based verification that the lint is real, not cosmetic: a known-bad CSS sample (a literal hex in a component file, an off-scale `px`, and a bare `outline: none`) must each be flagged by `lint:css`; the real `tokens.css` + `global.css` must pass clean. Place fixtures so they are linted on demand but do NOT pollute the shipped bundle (e.g. a `__lint-fixtures__` dir excluded from the build/Vite entry, asserted via a test or a documented `npm run` check).
   - [x] Record the red→green evidence (the failing-fixture output, then the clean pass) in Debug Log References.
+
+### Review Findings
+
+- [x] [Review][Patch] High-contrast muted text token duplicates a raw color instead of aliasing `--color-on-surface` [apps/web/src/styles/tokens.css:75]
+- [x] [Review][Patch] Font stack token does not match the committed exact stack casing [apps/web/src/styles/tokens.css:33]
+- [x] [Review][Patch] Focus-ring lint accepts non-compliant `:focus-visible` restore rules [apps/web/stylelint-plugins/focus-visible-pairing.js:37]
+- [x] [Review][Patch] Literal color-name token lint uses an incomplete denylist [apps/web/stylelint.config.js:61]
 
 ## Dev Notes
 
@@ -200,10 +207,12 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context) — dev-story workflow.
 
 - **Dependency resolution:** first attempt to install `stylelint-config-standard@^39` failed `ERESOLVE` — v39 peers on `stylelint@^16`, but `stylelint` latest is `17.13.0`. The matching pair is `stylelint-config-standard@40.0.0` (peers `stylelint@^17.0.0`). Installed `stylelint@^17.13.0` + `stylelint-config-standard@^40.0.0`.
 - **config-standard noise (first lint run, 6 errors):** `import-notation` (wanted `url()`), `property-no-vendor-prefix` (`-webkit-text-size-adjust`), and three `custom-property-empty-line-before` / `comment-empty-line-before` cosmetic flags in `tokens.css`. Resolved: switched `@import` to `url()`; added a single targeted `stylelint-disable-next-line property-no-vendor-prefix` (the `-webkit-` prefix is committed by the UX spec and there is no autoprefixer in the build); disabled the two empty-line cosmetic rules (they fight the deliberately compact, grouped token file and are orthogonal to the token-name lint's purpose). Real CSS then linted clean (exit 0).
-- **Red→green evidence (AC #3) — `lint:css:selftest`, all 10 cases pass:**
+- **Red→green evidence (AC #3) — `lint:css:selftest`, all 14 cases pass:**
   - RED (must fail): literal hex → `color-no-hex` ✓; named color → `color-named` ✓; `rgb()` → `function-disallowed-list` ✓; off-scale px on spacing → `declaration-property-unit-disallowed-list` ✓; on-scale px on spacing also rejected (forces the token) ✓; `--color-white` custom property → `custom-property-pattern` ✓ (fires even inside `tokens.css`); `outline: none` with no paired `:focus-visible` → `tlf/focus-visible-pairing` ✓.
+  - RED review regressions (must fail): `--color-beige` custom property → `custom-property-pattern` ✓; `outline: 0 solid transparent` → `tlf/focus-visible-pairing` ✓; incomplete `:focus-visible` ring with `1px` outline → `tlf/focus-visible-pairing` ✓; missing `outline-offset: 2px` → `tlf/focus-visible-pairing` ✓.
   - GREEN (must pass): raw hex in `tokens.css` (sanctioned) → `color-no-hex` silent ✓; off-scale px in `tokens.css` (declares the scale) → unit rule silent ✓; `outline: none` paired with a `:focus-visible { … var(--color-focus) }` rule → pairing rule silent ✓.
-- **Full gate set green (Node 24):** `typecheck` (all workspaces) ✓; `lint:css` ✓; `lint:css:selftest` 10/10 ✓; web `eslint` ✓; web `build` ✓ (CSS bundle 1.40 kB / 0.64 kB gzip ships the tokens); Vitest `unit` 13 ✓ + `integration` 9 ✓ (22 total — no regressions vs Story 1.2).
+- **Code-review fixes (2026-06-18):** `prefers-contrast: more` now aliases `--color-on-surface-muted` to `var(--color-on-surface)`; `--font-body` preserves the committed UX-spec casing with a targeted `value-keyword-case` disable around that single token; `tlf/focus-visible-pairing` now requires the exact committed `outline: 2px solid var(--color-focus)` plus `outline-offset: 2px`; custom-property literal color-name detection now rejects the CSS named-color vocabulary as standalone name segments.
+- **Full gate set green (Node 24):** `typecheck` (all workspaces) ✓; `lint:css` ✓; `lint:css:selftest` 14/14 ✓; web `eslint` ✓; web `build` ✓ (CSS bundle 1.42 kB / 0.65 kB gzip ships the tokens); Vitest `unit` 13 ✓ + `integration` 9 ✓ (22 total — no regressions vs Story 1.2).
 
 ### Completion Notes List
 
@@ -212,7 +221,7 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context) — dev-story workflow.
   - **AC #2 — `global.css`:** `@import`s tokens, applies the committed `html { color-scheme: light; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }` block, the system-font stack + base type via `var()` tokens, and a small normalize. The 3-step type scale + 3 weights live as tokens. No user-facing heading elements: removed the walking-skeleton `<h1>The Long Finger</h1>` from `App.tsx`.
   - **AC #3 — token-name lint (the load-bearing deliverable):** stylelint (`apps/web/stylelint.config.js`, extends config-standard) gates on (1) literal color values outside `tokens.css` (`color-no-hex` + `color-named: never` + `function-disallowed-list` of color functions), (2) off-scale px on spacing/layout properties (`declaration-property-unit-disallowed-list`), and (3) the focus-ring pairing via the local plugin. `tokens.css` is the single sanctioned home for raw color/px literals (per-file `overrides`). Wired into CI (`.github/workflows/ci.yml`) as the first web gate, plus a self-test step that guards the gate itself from rotting.
   - **AC #4 — focus ring:** the single base rule in `global.css` is exactly `:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }` — `:focus-visible` only, never bare `:focus`. The `tlf/focus-visible-pairing` plugin fails the build on any `outline: none`/`0` not paired with a `:focus-visible` ring restoring `var(--color-focus)`.
-- **Focus-ring pairing mechanism (Task 5) — where it lives & its limit:** implemented as a local stylelint plugin at `apps/web/stylelint-plugins/focus-visible-pairing.js` (rule `tlf/focus-visible-pairing`). The pairing is checked **per-stylesheet (root)**, not per-selector: a file that removes the outline must contain at least one `:focus-visible { outline: … var(--color-focus) … }` rule. Sufficient for our model (the base ring lives once in `global.css`; component CSS that opts out must re-establish it in the same file). A selector-precise pairing check is intentionally out of scope.
+- **Focus-ring pairing mechanism (Task 5) — where it lives & its limit:** implemented as a local stylelint plugin at `apps/web/stylelint-plugins/focus-visible-pairing.js` (rule `tlf/focus-visible-pairing`). The pairing is checked **per-stylesheet (root)**, not per-selector: a file that removes the outline must contain at least one `:focus-visible` rule with the exact committed `outline: 2px solid var(--color-focus); outline-offset: 2px;` declarations. Sufficient for our model (the base ring lives once in `global.css`; component CSS that opts out must re-establish it in the same file). A selector-precise pairing check is intentionally out of scope.
 - **Tracked decision — lint scope is `.css` files only (matches the epic AC "Given a CSS file").** The UX spec additionally lists `style=` attribute strings in `*.tsx/*.ts` (CI gate item 1). v1 uses CSS with no inline styles, so this is **not** built here; if inline styles are ever introduced, add an ESLint `no-restricted-syntax` rule on JSX `style` literals. Recorded so it is a deliberate boundary, not a silent gap.
 - **Deferred gates (NOT this story, per epics Notes 14/18 & C.14):** axe-core, contrast-regression computation from the token source, Playwright forced-colors / reduced-motion / 200%-zoom, and the bundle-size budget all arrive with the rendered list view in Story 1.6. The CI comment was updated to reflect that the token-name lint has landed and these remain deferred.
 - **Dependencies added (`apps/web` devDependencies):** `stylelint@^17.13.0`, `stylelint-config-standard@^40.0.0` (only new deps; no runtime deps). Recorded per the Story 1.2 pinning discipline.
@@ -245,3 +254,4 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context) — dev-story workflow.
 |------------|------------------------------------------------------------------------|
 | 2026-06-18 | Story 1.3 created — comprehensive context engine analysis; status → ready-for-dev. |
 | 2026-06-18 | Implemented Tasks 1–7: `tokens.css` committed semantic token set, `global.css` base layer + `:focus-visible` ring, removed `index.css`/skeleton `<h1>`, stylelint token-name lint (literal-color / off-scale-px / semantic custom-property names) + local `tlf/focus-visible-pairing` plugin, CI gate + self-test (10/10), root passthrough scripts. typecheck + lint:css + selftest + eslint + web build + Vitest 22/22 all green under Node 24. Status → review. |
+| 2026-06-18 | Addressed code review findings: contrast token alias, exact font-stack casing, stricter exact focus-ring lint, expanded named-color token rejection, and 14-case lint self-test. typecheck + lint:css + selftest + eslint + web build + Vitest 22/22 all green under Node 24. Status → done. |

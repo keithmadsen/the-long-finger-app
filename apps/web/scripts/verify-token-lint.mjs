@@ -63,8 +63,32 @@ const cases = [
     expect: 'custom-property-pattern',
   },
   {
+    name: 'less-obvious literal color-name custom property is rejected',
+    code: ':root { --color-beige: #f5f4ef; }',
+    file: 'src/styles/tokens.css',
+    expect: 'custom-property-pattern',
+  },
+  {
     name: 'outline:none without a paired :focus-visible is rejected',
     code: '.btn { outline: none; }',
+    file: 'src/components/btn.css',
+    expect: 'tlf/focus-visible-pairing',
+  },
+  {
+    name: 'outline removal with transparent shorthand is rejected',
+    code: '.btn { outline: 0 solid transparent; }',
+    file: 'src/components/btn.css',
+    expect: 'tlf/focus-visible-pairing',
+  },
+  {
+    name: 'outline:none with an incomplete :focus-visible ring is rejected',
+    code: '.btn { outline: none; } .btn:focus-visible { outline: 1px solid var(--color-focus); outline-offset: 2px; }',
+    file: 'src/components/btn.css',
+    expect: 'tlf/focus-visible-pairing',
+  },
+  {
+    name: 'outline:none with missing focus-visible offset is rejected',
+    code: '.btn { outline: none; } .btn:focus-visible { outline: 2px solid var(--color-focus); }',
     file: 'src/components/btn.css',
     expect: 'tlf/focus-visible-pairing',
   },
