@@ -4,7 +4,7 @@ baseline_commit: 3089fc762539f03a507f4d3793a07d5b9582a237
 
 # Story 1.2: Todo contracts, schema & repository (real read path)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -98,8 +98,8 @@ so that both apps share one source of truth and the read path is correct and per
 
 - [x] [Review][Patch] Partial existing `todos` schemas with `description` are accepted instead of rejected [apps/api/src/db/schema.ts:35]
 - [x] [Review][Patch] Error handler trusts out-of-range `error.statusCode` values [apps/api/src/plugins/error-handler.ts:32]
-- [ ] [Review][Patch] Full-table detection validates column names but not column definitions [apps/api/src/db/schema.ts:40]
-- [ ] [Review][Patch] Error-handler clamp lacks regression coverage for valid custom error statuses [apps/api/test/integration/todos.routes.test.ts:200]
+- [x] [Review][Patch] Full-table detection validates column names but not column definitions [apps/api/src/db/schema.ts:40]
+- [x] [Review][Patch] Error-handler clamp lacks regression coverage for valid custom error statuses [apps/api/test/integration/todos.routes.test.ts:200]
 
 ## Dev Notes
 
@@ -196,6 +196,9 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context) — dev-story workflow.
 - ✅ Resolved review finding [Patch]: **Partial `todos` schema accepted instead of rejected** (`db/schema.ts`). The migration probe keyed off the mere *presence* of a `description` column, so a partial table like `(id, description)` slipped through as a `CREATE TABLE IF NOT EXISTS` no-op and left a broken schema. Now matches the **exact full column set** (`TODOS_COLUMNS`) — only the precise full shape is a no-op, only the exact id-only skeleton is dropped+recreated, and any other shape (including partials carrying `description`) throws. Added a unit test for the `(id, description)` partial-table throw path.
 - ✅ Resolved review finding [Patch]: **Error handler trusted out-of-range `error.statusCode`** (`plugins/error-handler.ts`). A buggy throw carrying a non-error status (e.g. `200`) or an out-of-range value was echoed straight back as the response status. The handler now accepts a status only when it is an integer in `[400, 599]`, falling back to `500` otherwise. Added an integration test asserting a thrown error with `statusCode = 200` produces a `500` `INTERNAL_SERVER_ERROR` envelope.
 - Verified after fixes: all-workspace `typecheck` green; full Vitest suite green (**20 tests**, 4 files — unit + integration; +2 new regression tests). No new dependencies, no new CI gates.
+- ✅ Resolved review finding [Patch]: **Full-table detection validated names but not definitions** (`db/schema.ts`). The migration probe now compares `PRAGMA table_info` metadata for the expected `type`, `notnull`, `dflt_value`, and `pk` values, so same-name malformed tables are rejected instead of being treated as valid full tables. Added a unit regression for a same-column incompatible schema.
+- ✅ Resolved review finding [Patch]: **Error-handler clamp lacked valid-status preservation coverage** (`todos.routes.test.ts`). Added an integration regression proving a valid custom `statusCode` in the 4xx/5xx range is preserved by the clamp.
+- Verified after final review fixes: all-workspace `typecheck` green; full test suite green (**22 tests**, 4 files — unit + integration; +2 additional regression tests). No new dependencies, no new CI gates.
 
 ### File List
 
@@ -247,3 +250,4 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context) — dev-story workflow.
 | 2026-06-16 | Story 1.2 created — comprehensive context engine analysis; status → ready-for-dev. |
 | 2026-06-17 | Implemented Tasks 1–9: full `@tlf/contracts` surface, real `todos` schema + migration seam, WAL/pragmas, repository (canonical list, mapper, idempotent insert, server timestamps), typed `GET /todos`, FR-9 durability, `@fastify/swagger` OpenAPI, uniform `errorEnvelope` handler. ATDD scaffolds promoted into canonical co-located tests. typecheck + Vitest unit/integration green. Status → review. |
 | 2026-06-18 | Addressed code review findings — 2 items resolved: strict full-column-set match in the schema migration probe (reject partial tables carrying `description`); error handler clamps to a valid `[400,599]` status, falling back to 500. +2 regression tests. Full suite 20/20 + typecheck green (run under Node 24). Status → review. |
+| 2026-06-18 | Addressed final code review findings — schema probe now validates full column definitions, and valid custom error statuses have regression coverage. Full suite 22/22 + typecheck green (run under Node 24). Status → done. |

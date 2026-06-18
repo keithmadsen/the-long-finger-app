@@ -46,6 +46,22 @@ describe('applySchema (AC 2)', () => {
     db.close();
   });
 
+  it('throws when expected columns exist with incompatible definitions', () => {
+    const db = new Database(':memory:');
+    db.exec(`
+      CREATE TABLE todos (
+        id TEXT,
+        description TEXT,
+        completed TEXT,
+        created_at TEXT,
+        updated_at TEXT
+      )
+    `);
+
+    expect(() => applySchema(db)).toThrow(/unexpected schema/i);
+    db.close();
+  });
+
   it('never drops the full table unconditionally — existing rows survive (AC 9 guard)', () => {
     const db = new Database(':memory:');
     applySchema(db);
