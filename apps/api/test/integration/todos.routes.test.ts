@@ -196,4 +196,54 @@ describe('uniform error envelope on non-2xx (AC 11)', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('coerces an out-of-range error.statusCode to a 500 envelope, not a bogus status', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tlf-error-'));
+    const databasePath = join(dir, 'todos.db');
+    const app = await buildServer({ databasePath, logger: false });
+
+    try {
+      app.get('/__bad_status', async () => {
+        // An error carrying a non-error HTTP status (e.g. a buggy 3rd-party
+        // throw). The handler must not echo it back as the response status.
+        const err = new Error('weird status') as Error & { statusCode: number };
+        err.statusCode = 200;
+        throw err;
+      });
+      await app.ready();
+
+      const res = await app.inject({ method: 'GET', url: '/__bad_status' });
+      expect(res.statusCode).toBe(500);
+      expect(res.json()).toEqual({
+        error: { code: 'INTERNAL_SERVER_ERROR', message: expect.any(String) },
+      });
+    } finally {
+      await app.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves valid custom error.statusCode values inside the 4xx/5xx range', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tlf-error-'));
+    const databasePath = join(dir, 'todos.db');
+    const app = await buildServer({ databasePath, logger: false });
+
+    try {
+      app.get('/__custom_status', async () => {
+        const err = new Error('custom client failure') as Error & { statusCode: number };
+        err.statusCode = 418;
+        throw err;
+      });
+      await app.ready();
+
+      const res = await app.inject({ method: 'GET', url: '/__custom_status' });
+      expect(res.statusCode).toBe(418);
+      expect(res.json()).toEqual({
+        error: { code: 'ERROR', message: 'custom client failure' },
+      });
+    } finally {
+      await app.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
