@@ -29,7 +29,13 @@ function codeForStatus(statusCode: number): string {
 // every route on the instance, including those registered after this call.
 export function registerErrorHandler(app: FastifyInstance): void {
   app.setErrorHandler((error: FastifyError, request, reply) => {
-    const statusCode = error.validation ? 400 : (error.statusCode ?? 500);
+    // Never trust an error's statusCode blindly: a buggy throw can carry a
+    // non-error status (e.g. 200) or an out-of-range value, which would
+    // otherwise be echoed back as the response status. Only accept a valid
+    // HTTP error status (4xx/5xx); anything else falls back to 500.
+    const rawStatus = error.validation ? 400 : (error.statusCode ?? 500);
+    const statusCode =
+      Number.isInteger(rawStatus) && rawStatus >= 400 && rawStatus <= 599 ? rawStatus : 500;
 
     if (statusCode >= 500) {
       // Log the real error server-side; never expose it in the response body.

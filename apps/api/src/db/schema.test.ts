@@ -36,6 +36,16 @@ describe('applySchema (AC 2)', () => {
     db.close();
   });
 
+  it('throws on a partial table that has `description` but is not the full shape', () => {
+    const db = new Database(':memory:');
+    // Has `description` but is missing completed/created_at/updated_at — a
+    // `CREATE TABLE IF NOT EXISTS` would silently no-op and leave this broken.
+    db.exec('CREATE TABLE todos (id TEXT PRIMARY KEY, description TEXT)');
+
+    expect(() => applySchema(db)).toThrow(/unexpected schema/i);
+    db.close();
+  });
+
   it('never drops the full table unconditionally — existing rows survive (AC 9 guard)', () => {
     const db = new Database(':memory:');
     applySchema(db);

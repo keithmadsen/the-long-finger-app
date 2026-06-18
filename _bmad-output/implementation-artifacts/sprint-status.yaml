@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-16
-last_updated: 2026-06-17
+last_updated: 2026-06-18
 project: the long finger
 # 2026-06-16: epic-1 → in-progress, 1-1 → ready-for-dev (create-story)
 # 2026-06-16: 1-1 → in-progress (dev-story)
@@ -45,6 +45,7 @@ project: the long finger
 # 2026-06-17: 1-2 → in-progress (dev-story)
 # 2026-06-17: 1-2 → review (dev-story complete)
 # 2026-06-17: 1-2 → in-progress (code-review action items)
+# 2026-06-18: 1-2 → review (code-review action items resolved)
 project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"
@@ -53,7 +54,7 @@ development_status:
   # Epic 1: Capture, View & Complete Your List
   epic-1: in-progress
   1-1-monorepo-scaffold-walking-skeleton: done
-  1-2-todo-contracts-schema-repository-real-read-path: in-progress
+  1-2-todo-contracts-schema-repository-real-read-path: review
   1-3-design-tokens-typography-foundation: backlog
   1-4-button-textinput-primitives: backlog
   1-5-checkbox-liveregion-primitives: backlog
