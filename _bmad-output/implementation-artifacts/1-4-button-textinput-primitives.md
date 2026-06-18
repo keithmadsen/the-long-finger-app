@@ -4,7 +4,7 @@ baseline_commit: ea6e33ba8eb3fe120fcbe2191a01c95a6684c647
 
 # Story 1.4: Button & TextInput primitives
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -163,3 +163,22 @@ GPT-5 Codex
 |------------|--------|
 | 2026-06-18 | Story 1.4 created; status -> ready-for-dev. |
 | 2026-06-18 | Implemented Button/TextInput primitives, web unit-test harness, tests, and CI web test gate; status -> review. |
+
+## Review Findings
+
+<!-- Code review 2026-06-18 (baseline ea6e33b..bcd7296). Layers: Blind Hunter, Edge Case Hunter, Acceptance Auditor. All 4 ACs SATISFIED; findings below are hardening, not AC violations. -->
+
+- [x] [Review][Decision→Patch] TextInput never called `preventDefault()` on the Enter it owns — would have triggered native form submission/reload once composed into a `<form>` (Story 1.7). FIXED: added `event.preventDefault()` for owned non-composing Enter so `onSubmit` is the single submit path. [apps/web/src/components/primitives/TextInput.tsx:29]
+- [x] [Review][Patch] Pending / `aria-disabled` buttons kept the active `--color-surface` background. FIXED: moved `background: var(--color-surface-muted)` into the shared disabled/aria-disabled/data-pending rule. [apps/web/src/components/primitives/Button.module.css:21]
+- [x] [Review][Patch] No positive test that an enabled Button click invokes `onClick`. FIXED: added `invokes onClick when enabled` test asserting one call. [apps/web/src/components/primitives/Button.test.tsx]
+- [x] [Review][Patch] IME-composition test could pass regardless of the `isComposing` branch. FIXED: rewrote with `fireEvent.keyDown` asserting composing-Enter does NOT submit and the same Enter post-composition DOES submit (proves the discriminator). [apps/web/src/components/primitives/TextInput.test.tsx]
+- [x] [Review][Patch] "is controlled" test did not assert the displayed value stays fixed. FIXED: added `expect(input).toHaveValue('')` after typing. [apps/web/src/components/primitives/TextInput.test.tsx:8]
+- [x] [Review][Patch] Untested branches (guarded keyboard activation, `onKeyDown` `preventDefault()` short-circuit, `aria-busy` override precedence). FIXED: added `blocks keyboard activation while guarded`, `pending overrides a caller-supplied aria-busy={false}`, and `does not submit when a caller onKeyDown calls preventDefault` tests. [apps/web/src/components/primitives/Button.test.tsx, TextInput.test.tsx]
+
+<!-- All 6 findings resolved 2026-06-18. Gates re-run green: web tests 16/16, typecheck, lint:css, lint:css:selftest 14/14, web build. Status -> done. -->
+
+## Change Log Addendum
+
+| Date       | Change |
+|------------|--------|
+| 2026-06-18 | Code review: applied 6 patches (TextInput Enter preventDefault, disabled-bg consolidation, +4 test-coverage hardening); all gates green; status -> done. |

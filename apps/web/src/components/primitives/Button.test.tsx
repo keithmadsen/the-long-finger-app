@@ -25,6 +25,17 @@ describe('Button', () => {
     expect(button).toHaveAttribute('aria-pressed', 'true')
   })
 
+  it('invokes onClick when enabled', async () => {
+    const user = userEvent.setup()
+    const handleClick = vi.fn()
+
+    render(<Button onClick={handleClick}>Save</Button>)
+
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(handleClick).toHaveBeenCalledTimes(1)
+  })
+
   it('blocks clicks when natively disabled', async () => {
     const user = userEvent.setup()
     const handleClick = vi.fn()
@@ -76,6 +87,39 @@ describe('Button', () => {
     await user.click(button)
 
     expect(handleClick).not.toHaveBeenCalled()
+  })
+
+  it('blocks keyboard activation while guarded', async () => {
+    const user = userEvent.setup()
+    const handleClick = vi.fn()
+
+    render(
+      <Button pending onClick={handleClick}>
+        Saving
+      </Button>,
+    )
+
+    await user.tab()
+    const button = screen.getByRole('button', { name: 'Saving' })
+    expect(button).toHaveFocus()
+
+    await user.keyboard('{Enter}')
+    await user.keyboard(' ')
+
+    expect(handleClick).not.toHaveBeenCalled()
+  })
+
+  it('pending overrides a caller-supplied aria-busy={false}', () => {
+    render(
+      <Button pending aria-busy={false}>
+        Saving
+      </Button>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Saving' })).toHaveAttribute(
+      'aria-busy',
+      'true',
+    )
   })
 
   it('can receive keyboard focus', async () => {

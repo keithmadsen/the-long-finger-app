@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -11,9 +11,13 @@ describe('TextInput', () => {
 
     render(<TextInput aria-label="Task" value="" onChange={handleChange} />)
 
-    await user.type(screen.getByRole('textbox', { name: 'Task' }), 'Buy milk')
+    const input = screen.getByRole('textbox', { name: 'Task' })
+    await user.type(input, 'Buy milk')
 
     expect(handleChange).toHaveBeenCalled()
+    // Controlled: the value prop is fixed at '', so the display never changes
+    // regardless of keystrokes. Proves the value wiring is not uncontrolled.
+    expect(input).toHaveValue('')
   })
 
   it('forwards maxLength, placeholder, and aria-describedby', () => {
@@ -73,7 +77,7 @@ describe('TextInput', () => {
     expect(handleSubmit).not.toHaveBeenCalled()
   })
 
-  it('ignores Enter while IME composition is active', () => {
+  it('ignores Enter while composing but submits the same value once composition ends', () => {
     const handleSubmit = vi.fn()
 
     render(
@@ -86,14 +90,36 @@ describe('TextInput', () => {
     )
 
     const input = screen.getByRole('textbox', { name: 'Task' })
-    input.dispatchEvent(
-      new KeyboardEvent('keydown', {
-        bubbles: true,
-        cancelable: true,
-        key: 'Enter',
-        isComposing: true,
-      }),
+
+    // Enter mid-composition must not submit. fireEvent (not userEvent) is used
+    // here deliberately because isComposing is a low-level native-event flag
+    // that userEvent does not simulate.
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+    expect(handleSubmit).not.toHaveBeenCalled()
+
+    // The same Enter on the same value once composition has ended must submit.
+    // This proves isComposing — not some unrelated reason — is the discriminator.
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(handleSubmit).toHaveBeenCalledWith('買う')
+  })
+
+  it('does not submit when a caller onKeyDown calls preventDefault', async () => {
+    const user = userEvent.setup()
+    const handleSubmit = vi.fn()
+
+    render(
+      <TextInput
+        aria-label="Task"
+        onChange={vi.fn()}
+        onKeyDown={(event) => {
+          event.preventDefault()
+        }}
+        onSubmit={handleSubmit}
+        value="Buy milk"
+      />,
     )
+
+    await user.type(screen.getByRole('textbox', { name: 'Task' }), '{Enter}')
 
     expect(handleSubmit).not.toHaveBeenCalled()
   })

@@ -37,6 +37,12 @@ export function TextInput({
       return
     }
 
+    // Own the Enter key: suppress native form submission so the component's
+    // validated onSubmit is the single submit path. Without this, composing
+    // this primitive into a <form> would also trigger a native submit/reload
+    // on Enter (including for blank values we intentionally do not submit).
+    event.preventDefault()
+
     const trimmedValue = value.trim()
     if (trimmedValue.length === 0) {
       return

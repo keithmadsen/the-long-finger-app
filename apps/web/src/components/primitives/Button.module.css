@@ -22,11 +22,8 @@
 .button[aria-disabled="true"],
 .button[data-pending="true"] {
   color: var(--color-on-surface-muted);
-  cursor: not-allowed;
-}
-
-.button:disabled {
   background: var(--color-surface-muted);
+  cursor: not-allowed;
 }
 
 .button:hover:not(:disabled, [aria-disabled="true"], [data-pending="true"]) {
