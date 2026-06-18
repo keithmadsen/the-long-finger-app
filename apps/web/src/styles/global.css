@@ -1,0 +1,48 @@
+/*
+ * Global stylesheet — base layer for the app.
+ *
+ * Pulls in the design tokens, sets the system-font stack and the committed
+ * first-paint guards, a minimal normalize, and the single `:focus-visible`
+ * focus ring that every primitive (Stories 1.4/1.5) inherits.
+ *
+ * No user-facing heading elements are introduced here (no heading hierarchy in
+ * v1 — the list is the only content). Source: ux-design-specification.md.
+ */
+
+@import url("./tokens.css");
+
+html {
+  color-scheme: light; /* Prevents form-control dark-mode flash on first paint. */
+  /* Intentional, committed vendor prefix: iOS Safari needs -webkit- here and the
+     build has no autoprefixer. Prevents landscape body-copy inflation. */
+  /* stylelint-disable-next-line property-no-vendor-prefix */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-item);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-item);
+  color: var(--color-on-surface);
+  background: var(--color-surface);
+}
+
+/*
+ * Single source of the focus ring. Applied via :focus-visible ONLY — a mouse
+ * click must not paint the ring, only keyboard focus does. Non-color-only by
+ * virtue of width + offset, so it stays readable in forced-colors / high
+ * contrast. (Safari < 15.4 shows it on click too; accepted, not worked around.)
+ */
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}

@@ -5,8 +5,12 @@ import type { Todo } from '@tlf/contracts'
 // render the (empty) result. This proves the full round-trip
 // (browser → Vite proxy → Fastify → repository → SQLite → back), AC 4.
 //
-// A plain fetch is correct here. TanStack Query, hooks, primitives, recipes,
-// and design tokens are Stories 1.3–1.7 — deliberately absent.
+// A plain fetch is correct here. TanStack Query, hooks, primitives, and
+// recipes are Stories 1.4–1.7 — deliberately absent. (Design tokens land in
+// Story 1.3 via styles/global.css, imported in main.tsx.)
+//
+// No user-facing heading element is rendered: v1 has no heading hierarchy
+// (the list is the only content) — see ux-design-specification.md.
 function App() {
   // Typed from the shared contract to prove the cross-app import compiles
   // (Story 1.2, AC 1). Rendering stays skeleton-thin — the list UI is Story 1.6.
@@ -32,7 +36,6 @@ function App() {
 
   return (
     <main>
-      <h1>The Long Finger</h1>
       {!loaded && <p>Loading…</p>}
       {error && <p role="alert">{error}</p>}
       {loaded && !error && todos.length === 0 && <p>No tasks yet.</p>}
