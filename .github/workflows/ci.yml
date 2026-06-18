@@ -5,10 +5,12 @@ on:
   push:
     branches: [main]
 
-# Story 1.1 gate set: type-check + the two Vitest projects. Each step fails the
-# build (blocks merge) on failure. Playwright, contrast-regression, axe-core,
-# and bundle-size gates are deliberately deferred until a web build/UI exists
-# (epics.md Notes C.14).
+# Gate set: type-check + the two Vitest projects + the CSS token-name lint
+# (added in Story 1.3 — the first web gate; epics.md Notes 14). Each step fails
+# the build (blocks merge) on failure. The contrast-regression, axe-core,
+# Playwright (forced-colors / reduced-motion / 200%-zoom) and bundle-size gates
+# are deliberately deferred until the rendered list view exists (Story 1.6;
+# epics.md Notes 14/18, C.14).
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -27,6 +29,12 @@ jobs:
 
       - name: Type-check (all workspaces)
         run: npm run typecheck
+
+      - name: CSS token-name lint (literal colors / off-scale px / focus-ring pairing)
+        run: npm run lint:css
+
+      - name: CSS token-name lint self-test (guards the gate itself)
+        run: npm run lint:css:selftest
 
       - name: Unit tests (Vitest)
         run: npm run test:unit

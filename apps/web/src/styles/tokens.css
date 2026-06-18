@@ -1,0 +1,95 @@
+/*
+ * Design tokens — the single calm visual vocabulary for the app.
+ *
+ * This is the ONLY stylesheet permitted to declare raw color literals and the
+ * canonical px/ms scale values; every other CSS file must reference these
+ * custom properties. The token-name lint (Story 1.3) enforces that.
+ *
+ * Light theme only in v1. Names are semantic (never literal — no
+ * `--color-white`/`--color-grey-100`); dark mode is a future redefinition of
+ * these same variables, not a rewrite (see the placeholder at the bottom).
+ *
+ * Source of truth: ux-design-specification.md (Color System, Typography System,
+ * Spacing & Layout Foundation, Motion).
+ */
+
+:root {
+  /* ---- Surfaces ------------------------------------------------------- */
+  --color-surface: #fafaf7; /* Page background; warm off-white "paper". */
+  --color-surface-muted: #f0efea; /* Separators, empty-state surface, hover bg. */
+  --color-surface-hover: #f5f4ef; /* Desktop hover on interactive rows. */
+  --color-on-surface: #1a1a18; /* Active/primary text; near-black with warmth. */
+  --color-on-surface-muted: #5a5954; /* Completed/pending/secondary text. */
+
+  /* ---- Accents, borders, focus, error --------------------------------- */
+  --color-border: #dddcd5; /* Form-control borders (TextInput, Checkbox). */
+  --color-divider: #e4e2dc; /* Between-row rules; pencil-guide weight. */
+  --color-accent: #3d5a80; /* Affordance (links, retry); muted slate blue. */
+  --color-focus: #3d5a80; /* Focus ring; declared separately to allow divergence. */
+  --color-error: #a02d2d; /* Error text, inline-error row marker. */
+
+  /* ---- Typography ----------------------------------------------------- */
+  /* System fonts only — zero font payload, instant first paint. */
+  /* stylelint-disable value-keyword-case -- UX spec commits this exact font-stack casing. */
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  /* stylelint-enable value-keyword-case */
+
+  --font-size-item: 16px; /* Task text + input (satisfies the iOS-zoom >=16px rule). */
+  --font-size-secondary: 14px; /* Reserved. */
+  --font-size-micro: 12px; /* Reserved. */
+
+  --font-weight-regular: 400; /* Body/item/input text. */
+  --font-weight-medium: 500; /* Affordance labels (Retry, etc.). */
+  --font-weight-semibold: 600; /* Reserved. */
+
+  --line-height-item: 1.5; /* Task text — comfortable reading at 16px. */
+  --line-height-secondary: 1.4; /* Reserved. */
+  --line-height-micro: 1.3; /* Reserved. */
+
+  /* ---- Spacing (4px base) --------------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --row-height-touch: 48px; /* Min row height; one-thumb comfortable. */
+
+  /* ---- Radius / border ------------------------------------------------ */
+  --radius-none: 0; /* List rows — paper edge. */
+  --radius-sm: 4px; /* TextInput, Button corners. */
+  --border-width-thin: 1px; /* TextInput border, between-row divider. */
+
+  /* ---- Motion --------------------------------------------------------- */
+  --motion-instant: 120ms; /* Quick transitions; collapses to 0ms under reduced-motion. */
+  --motion-settle: 220ms; /* Settle/completion beat; collapses to 0ms under reduced-motion. */
+  --motion-none: 0ms; /* Zero motion regardless of preference (honest-pending swap). */
+  --motion-ease: cubic-bezier(0.2, 0, 0, 1); /* Single easing curve; no overshoot. */
+}
+
+/*
+ * prefers-contrast: more — collapse the muted distinction to full contrast.
+ * Readers who prefer maximum contrast get on-surface text everywhere; the
+ * pending/completed signal then rests on its non-color cues (aria-busy,
+ * strikethrough, checkbox state).
+ */
+@media (prefers-contrast: more) {
+  :root {
+    --color-on-surface-muted: var(--color-on-surface);
+  }
+}
+
+/*
+ * Dark mode — OUT OF MVP SCOPE (light only in v1).
+ *
+ * The semantic token vocabulary above is structured so dark mode is a
+ * redefinition of these same variables here, not a component rewrite. Do not
+ * populate this block in v1.
+ *
+ * @media (prefers-color-scheme: dark) {
+ *   :root {
+ *     // redefine --color-* tokens for dark theme (v1.1 decision)
+ *   }
+ * }
+ */
