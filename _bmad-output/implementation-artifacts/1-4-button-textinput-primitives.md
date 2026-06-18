@@ -1,0 +1,184 @@
+---
+baseline_commit: ea6e33ba8eb3fe120fcbe2191a01c95a6684c647
+---
+
+# Story 1.4: Button & TextInput primitives
+
+Status: done
+
+<!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
+
+## Story
+
+As a developer on the team,
+I want accessible `<Button>` and `<TextInput>` primitives,
+so that recipes compose consistent, keyboard-ready controls without re-implementing focus or input normalization.
+
+## Acceptance Criteria
+
+1. **Given** `<Button>`, **When** rendered, **Then** it exposes `onClick`, `disabled`, `aria-pressed`, `aria-busy`, `aria-disabled`, shows the `:focus-visible` ring, has a >=44px hit area, and reflects disabled and pending states. [Source: _bmad-output/planning-artifacts/epics.md#Story-1.4; _bmad-output/planning-artifacts/ux-design-specification.md#Component-Inventory]
+2. **Given** `<TextInput>`, **When** rendered, **Then** font-size is >=16px (no iOS zoom), it is controlled (`value`/`onChange`), supports `maxLength`, `placeholder`, `aria-describedby`, and emits a validated submit on Enter (`onSubmit`). [Source: _bmad-output/planning-artifacts/epics.md#Story-1.4; _bmad-output/planning-artifacts/ux-design-specification.md#Component-Inventory]
+3. **Given** keyboard-only use, **When** I Tab to either primitive, **Then** focus is visible and operable **And** a mouse click does not show the `:focus-visible` ring. [Source: _bmad-output/planning-artifacts/epics.md#Story-1.4; _bmad-output/planning-artifacts/ux-design-specification.md#Focus-Ring]
+4. **Given** the primitives, **When** inspected, **Then** prop names mirror Radix conventions **And** unit tests cover focus, disabled, and submit behavior. [Source: _bmad-output/planning-artifacts/epics.md#Story-1.4; _bmad-output/planning-artifacts/ux-design-specification.md#Post-MVP-Option-Preservation]
+
+## Tasks / Subtasks
+
+- [x] **Task 1 - Add the web component unit-test harness (AC: 4)**
+  - [x] Add web dev dependencies: `vitest@^4.1.9`, `jsdom@^29.1.1`, `@testing-library/react@^16.3.2`, `@testing-library/dom@^10.4.1`, `@testing-library/user-event@^14.6.1`, and `@testing-library/jest-dom@^6.9.1`.
+  - [x] Add `apps/web/vitest.config.ts` or extend `apps/web/vite.config.ts` with `test: { environment: 'jsdom', setupFiles: ['./src/test/setup.ts'] }`. Keep the existing Vite proxy intact.
+  - [x] Add `apps/web/src/test/setup.ts` importing `@testing-library/jest-dom/vitest`.
+  - [x] Add `apps/web/package.json` script `"test": "vitest run"`. Root `npm test` already runs workspace tests with `--if-present`, so this makes web unit tests part of the local aggregate test command.
+  - [x] Update `.github/workflows/ci.yml` with an explicit `npm run test --workspace apps/web` step, or replace the separate unit/integration commands with an aggregate command only if API project separation remains visible. Do not add Playwright, axe, contrast, or bundle gates in this story.
+
+- [x] **Task 2 - Create the primitive module structure (AC: 1-4)**
+  - [x] Add `apps/web/src/components/primitives/`.
+  - [x] Add `Button.tsx`, `Button.module.css`, `Button.test.tsx`, `TextInput.tsx`, `TextInput.module.css`, `TextInput.test.tsx`, and `index.ts`.
+  - [x] Export only the two primitives and their prop types from `index.ts`.
+  - [x] Do not wire these primitives into `App.tsx` or create recipes yet. `CaptureInput`, `TodoItem`, and list rendering are later stories.
+
+- [x] **Task 3 - Implement `<Button>` (AC: 1, 3, 4)**
+  - [x] Implement a native `<button>` wrapper; default `type="button"` unless the caller passes another `type`.
+  - [x] Prop surface must include native `onClick`, `disabled`, `aria-pressed`, `aria-busy`, and `aria-disabled`. Add a small `pending?: boolean` prop only to reflect the story's pending-state requirement; when true, set `aria-busy="true"` and a stable `data-pending="true"` styling hook.
+  - [x] If `disabled` is true, use native `disabled`. If `pending` or `aria-disabled` is true, preserve focusability unless the caller also passed `disabled`, but guard `onClick` by `preventDefault()` and not calling the handler.
+  - [x] Accept React 19 refs as a `ref` prop; do not use `forwardRef`.
+  - [x] Style with CSS Modules and existing design tokens only. Hit area should be at least `var(--row-height-touch)` (48px), which exceeds the >=44px AC; use `--radius-sm`, `--border-width-thin`, `--color-border`, `--color-surface`, `--color-surface-hover`, `--color-accent`, `--color-on-surface-muted`, and motion tokens as needed.
+  - [x] Do not define `:focus` styles. Use the global `:focus-visible` rule from `global.css`, or if component CSS needs a local rule, it must be exactly `outline: 2px solid var(--color-focus); outline-offset: 2px;` under `:focus-visible`.
+
+- [x] **Task 4 - Implement `<TextInput>` (AC: 2, 3, 4)**
+  - [x] Implement a native controlled `<input type="text">` wrapper with `value`, `onChange`, `onSubmit`, `maxLength`, `placeholder`, and `aria-describedby`.
+  - [x] `onSubmit` fires only on Enter. It receives `value.trim()` after validation; suppress submit for empty/whitespace-only values, and do not clear the input because the caller owns `value`.
+  - [x] Ignore Enter while IME composition is active (`event.nativeEvent.isComposing`) so partially composed text is not submitted.
+  - [x] Accept React 19 refs as a `ref` prop; do not use `forwardRef`.
+  - [x] Style with CSS Modules and existing tokens only. Font size must be `var(--font-size-item)` (16px) to satisfy the iOS zoom prevention rule; use `--row-height-touch`, `--space-*`, `--radius-sm`, `--border-width-thin`, `--color-border`, `--color-surface`, and `--color-on-surface`.
+  - [x] Do not create label, validation-message, character-counter, or recipe state APIs. Those belong to later recipe stories.
+
+- [x] **Task 5 - Unit-test primitive behavior (AC: 1-4)**
+  - [x] Button tests: renders as a native button; defaults to `type="button"`; forwards ARIA attributes; `disabled` blocks click; `pending` / `aria-disabled` blocks click without requiring native `disabled`; keyboard Tab can focus the button.
+  - [x] TextInput tests: controlled typing calls `onChange`; `maxLength`, `placeholder`, and `aria-describedby` are forwarded; Enter submits the trimmed value; empty/whitespace Enter does not submit; composing Enter does not submit; keyboard Tab can focus the input.
+  - [x] Use `userEvent.setup()` for interactions. Import `describe`, `it`, `expect`, and `vi` from `vitest` instead of relying on globals.
+  - [x] Do not try to assert actual `:focus-visible` rendering in jsdom. The mouse-vs-keyboard focus-ring behavior is satisfied by using `:focus-visible` only plus the existing CSS lint gate; unit tests should prove focusability and operability.
+
+- [x] **Task 6 - Verify gates (AC: 1-4)**
+  - [x] Run `npm run typecheck`.
+  - [x] Run `npm run lint:css`.
+  - [x] Run `npm run lint:css:selftest`.
+  - [x] Run `npm run test --workspace apps/web`.
+  - [x] Run `npm run test:unit` and `npm run test:integration`.
+  - [x] Run `npm run build --workspace apps/web`.
+
+## Dev Notes
+
+### Scope Guardrails
+
+- This story creates only the `Button` and `TextInput` primitives plus the web unit-test harness they need. Do not create `Checkbox`, `LiveRegion`, recipes, hooks, API calls, TanStack Query usage, or app-level UI integration. [Source: _bmad-output/planning-artifacts/epics.md#Story-1.4; _bmad-output/planning-artifacts/ux-design-specification.md#Component-Inventory]
+- The primitive layer is terminal for v1: four primitives total (`Button`, `TextInput`, `Checkbox`, `LiveRegion`). New visual product components should be recipes that compose primitives, not additional primitives. [Source: _bmad-output/planning-artifacts/ux-design-specification.md#Post-MVP-Option-Preservation]
+- No third-party headless library is installed for v1. Do not install Radix for this story; only mirror the relevant prop naming discipline. [Source: _bmad-output/planning-artifacts/ux-design-specification.md#Implementation-Approach]
+
+### Existing Foundation From Story 1.3
+
+- `apps/web/src/styles/tokens.css` and `global.css` already exist and are imported by `main.tsx`.
+- The global focus rule is already present: `:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }`.
+- The CSS lint gate already rejects literal colors, off-scale `px` values, and unsafe focus-ring patterns. Component CSS should use design tokens, not raw color literals or ad hoc pixel dimensions. [Source: _bmad-output/implementation-artifacts/1-3-design-tokens-typography-foundation.md]
+- `--row-height-touch` is 48px; use it for Button/TextInput minimum height instead of a raw `44px`/`48px` declaration. `--font-size-item` is 16px; use it for TextInput font size. [Source: _bmad-output/planning-artifacts/ux-design-specification.md#Tokens]
+
+### React 19 Ref Pattern
+
+- The web app is on React 19. Official React docs mark `forwardRef` as deprecated in React 19 and say components can receive `ref` as a prop. Type the primitives accordingly instead of wrapping them in `forwardRef`. [Source: https://react.dev/reference/react/forwardRef]
+
+### Prop Convention Clarification
+
+- The UX spec's general future-proofing language says primitive APIs mirror headless-library conventions such as `checked/onCheckedChange`, `open/onOpenChange`, and `value/onValueChange` for future selectable inputs. Story 1.4's AC and component inventory explicitly specify TextInput as `value` / `onChange` / `onSubmit`; those names are authoritative for this story. Do not rename TextInput to `onValueChange` unless the AC changes. [Source: _bmad-output/planning-artifacts/epics.md#Story-1.4; _bmad-output/planning-artifacts/ux-design-specification.md#Component-Inventory]
+
+### Testing Guidance
+
+- Current `apps/web` has no unit-test setup. This story is the right place to add Vitest + Testing Library for component tests. Vitest 4 requires Node >=20 and Vite >=6; this repo already pins CI to Node 24 and uses Vite 8. [Source: https://vitest.dev/guide/]
+- Testing Library's React docs recommend testing components through DOM output and user-observable behavior; avoid implementation-detail assertions. [Source: https://testing-library.com/docs/react-testing-library/intro/]
+- `@testing-library/user-event` v14 recommends `userEvent.setup()` before rendering/interacting in each test. [Source: https://testing-library.com/docs/user-event/intro/]
+- Latest versions checked on 2026-06-18: `vitest@4.1.9`, `jsdom@29.1.1`, `@testing-library/react@16.3.2`, `@testing-library/dom@10.4.1`, `@testing-library/user-event@14.6.1`, `@testing-library/jest-dom@6.9.1`.
+
+### Project Structure Notes
+
+- Expected new path: `apps/web/src/components/primitives/`, matching the architecture's frontend component layout. [Source: _bmad-output/planning-artifacts/architecture.md#Complete-Project-Directory-Structure]
+- Frontend components are PascalCase; tests are co-located as `src/**/*.test.tsx`; styles may use CSS Modules. [Source: _bmad-output/planning-artifacts/architecture.md#Structure-Patterns]
+- Primitives know nothing of data or network state. Recipes compose primitives; only hooks touch the network. [Source: _bmad-output/planning-artifacts/architecture.md#Complete-Project-Directory-Structure]
+- CI currently runs typecheck, CSS lint, CSS self-test, API unit tests, and API integration tests. Add the web unit test command without introducing deferred Playwright/axe/contrast/bundle gates. [Source: .github/workflows/ci.yml; _bmad-output/planning-artifacts/epics.md#UX-DR28]
+
+### References
+
+- [Source: _bmad-output/planning-artifacts/epics.md#Story-1.4] - story statement and acceptance criteria.
+- [Source: _bmad-output/planning-artifacts/epics.md#UX-DR3] - Button primitive requirements.
+- [Source: _bmad-output/planning-artifacts/epics.md#UX-DR4] - TextInput primitive requirements.
+- [Source: _bmad-output/planning-artifacts/epics.md#Notes] - primitive accessibility baseline and split primitive batch.
+- [Source: _bmad-output/planning-artifacts/architecture.md#Complete-Project-Directory-Structure] - `apps/web/src/components/primitives` location.
+- [Source: _bmad-output/planning-artifacts/architecture.md#Structure-Patterns] - frontend naming and co-located unit-test placement.
+- [Source: _bmad-output/planning-artifacts/ux-design-specification.md#Implementation-Approach] - native HTML substrate, CSS Modules/tokens, no third-party headless library in v1.
+- [Source: _bmad-output/planning-artifacts/ux-design-specification.md#Component-Inventory] - Button/TextInput purpose and prop surfaces.
+- [Source: _bmad-output/implementation-artifacts/1-3-design-tokens-typography-foundation.md] - existing token/focus lint implementation and Story 1.3 review learnings.
+- [Source: https://react.dev/reference/react/forwardRef] - React 19 ref guidance.
+- [Source: https://vitest.dev/guide/] - current Vitest guide and runtime requirements.
+- [Source: https://testing-library.com/docs/react-testing-library/intro/] - React Testing Library usage guidance.
+- [Source: https://testing-library.com/docs/user-event/intro/] - user-event v14 setup guidance.
+
+## Dev Agent Record
+
+### Agent Model Used
+
+GPT-5 Codex
+
+### Debug Log References
+
+- 2026-06-18: Added failing Button/TextInput tests first; initial `npm run test --workspace apps/web` failed because `./Button` and `./TextInput` did not exist.
+- 2026-06-18: After implementation, web tests initially failed because React Testing Library cleanup was not automatic in this Vitest setup; added explicit `cleanup()` in `apps/web/src/test/setup.ts`.
+- 2026-06-18: API tests initially failed under Node 22 due `better-sqlite3` native module ABI mismatch; reran API and aggregate tests with Node 24.16.0 first in `PATH`, matching repo engine and CI.
+
+### Completion Notes List
+
+- Added the web Vitest/jsdom/Testing Library harness and CI web component test step.
+- Added `Button` and `TextInput` primitives with native HTML substrates, React 19 `ref` prop support, CSS Modules, existing design tokens, and no app-level wiring.
+- `Button` defaults to `type="button"`, forwards native/ARIA props, reflects pending with `aria-busy` and `data-pending`, and guards clicks for pending or `aria-disabled` without forcing native disabled.
+- `TextInput` is controlled, forwards required input props, submits `value.trim()` only on Enter, suppresses empty submits, and ignores composing Enter.
+- Added unit tests covering focusability, disabled/pending/ARIA-disabled behavior, forwarded props, controlled typing, trimmed submit, empty suppression, and IME composition.
+- Validation passed: `npm run typecheck`; `npm run lint:css`; `npm run lint:css:selftest`; `npm run test --workspace apps/web`; `npm run test:unit` and `npm run test:integration` with Node 24.16.0 first in `PATH`; `npm run build --workspace apps/web`; aggregate `npm test` with Node 24.16.0 first in `PATH`.
+
+### File List
+
+- `.github/workflows/ci.yml`
+- `_bmad-output/implementation-artifacts/1-4-button-textinput-primitives.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `apps/web/package.json`
+- `apps/web/vite.config.ts`
+- `apps/web/src/components/primitives/Button.module.css`
+- `apps/web/src/components/primitives/Button.test.tsx`
+- `apps/web/src/components/primitives/Button.tsx`
+- `apps/web/src/components/primitives/TextInput.module.css`
+- `apps/web/src/components/primitives/TextInput.test.tsx`
+- `apps/web/src/components/primitives/TextInput.tsx`
+- `apps/web/src/components/primitives/index.ts`
+- `apps/web/src/test/setup.ts`
+- `package-lock.json`
+
+## Change Log
+
+| Date       | Change |
+|------------|--------|
+| 2026-06-18 | Story 1.4 created; status -> ready-for-dev. |
+| 2026-06-18 | Implemented Button/TextInput primitives, web unit-test harness, tests, and CI web test gate; status -> review. |
+
+## Review Findings
+
+<!-- Code review 2026-06-18 (baseline ea6e33b..bcd7296). Layers: Blind Hunter, Edge Case Hunter, Acceptance Auditor. All 4 ACs SATISFIED; findings below are hardening, not AC violations. -->
+
+- [x] [Review][Decision→Patch] TextInput never called `preventDefault()` on the Enter it owns — would have triggered native form submission/reload once composed into a `<form>` (Story 1.7). FIXED: added `event.preventDefault()` for owned non-composing Enter so `onSubmit` is the single submit path. [apps/web/src/components/primitives/TextInput.tsx:29]
+- [x] [Review][Patch] Pending / `aria-disabled` buttons kept the active `--color-surface` background. FIXED: moved `background: var(--color-surface-muted)` into the shared disabled/aria-disabled/data-pending rule. [apps/web/src/components/primitives/Button.module.css:21]
+- [x] [Review][Patch] No positive test that an enabled Button click invokes `onClick`. FIXED: added `invokes onClick when enabled` test asserting one call. [apps/web/src/components/primitives/Button.test.tsx]
+- [x] [Review][Patch] IME-composition test could pass regardless of the `isComposing` branch. FIXED: rewrote with `fireEvent.keyDown` asserting composing-Enter does NOT submit and the same Enter post-composition DOES submit (proves the discriminator). [apps/web/src/components/primitives/TextInput.test.tsx]
+- [x] [Review][Patch] "is controlled" test did not assert the displayed value stays fixed. FIXED: added `expect(input).toHaveValue('')` after typing. [apps/web/src/components/primitives/TextInput.test.tsx:8]
+- [x] [Review][Patch] Untested branches (guarded keyboard activation, `onKeyDown` `preventDefault()` short-circuit, `aria-busy` override precedence). FIXED: added `blocks keyboard activation while guarded`, `pending overrides a caller-supplied aria-busy={false}`, and `does not submit when a caller onKeyDown calls preventDefault` tests. [apps/web/src/components/primitives/Button.test.tsx, TextInput.test.tsx]
+
+<!-- All 6 findings resolved 2026-06-18. Gates re-run green: web tests 16/16, typecheck, lint:css, lint:css:selftest 14/14, web build. Status -> done. -->
+
+## Change Log Addendum
+
+| Date       | Change |
+|------------|--------|
+| 2026-06-18 | Code review: applied 6 patches (TextInput Enter preventDefault, disabled-bg consolidation, +4 test-coverage hardening); all gates green; status -> done. |

@@ -1,0 +1,32 @@
+.input {
+  min-height: var(--row-height-touch);
+  width: 100%;
+  padding-block: var(--space-2);
+  padding-inline: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-item);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-item);
+  color: var(--color-on-surface);
+  background: var(--color-surface);
+  transition:
+    border-color var(--motion-instant) var(--motion-ease),
+    background-color var(--motion-instant) var(--motion-ease);
+}
+
+.input::placeholder {
+  color: var(--color-on-surface-muted);
+}
+
+.input:disabled {
+  color: var(--color-on-surface-muted);
+  background: var(--color-surface-muted);
+  cursor: not-allowed;
+}
+
+.input:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-surface-hover);
+}
