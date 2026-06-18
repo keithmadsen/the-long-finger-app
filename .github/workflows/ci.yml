@@ -36,6 +36,9 @@ jobs:
       - name: CSS token-name lint self-test (guards the gate itself)
         run: npm run lint:css:selftest
 
+      - name: Web component tests (Vitest)
+        run: npm run test --workspace apps/web
+
       - name: Unit tests (Vitest)
         run: npm run test:unit
 

@@ -4,7 +4,7 @@ baseline_commit: ea6e33ba8eb3fe120fcbe2191a01c95a6684c647
 
 # Story 1.4: Button & TextInput primitives
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -23,48 +23,48 @@ so that recipes compose consistent, keyboard-ready controls without re-implement
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 - Add the web component unit-test harness (AC: 4)**
-  - [ ] Add web dev dependencies: `vitest@^4.1.9`, `jsdom@^29.1.1`, `@testing-library/react@^16.3.2`, `@testing-library/dom@^10.4.1`, `@testing-library/user-event@^14.6.1`, and `@testing-library/jest-dom@^6.9.1`.
-  - [ ] Add `apps/web/vitest.config.ts` or extend `apps/web/vite.config.ts` with `test: { environment: 'jsdom', setupFiles: ['./src/test/setup.ts'] }`. Keep the existing Vite proxy intact.
-  - [ ] Add `apps/web/src/test/setup.ts` importing `@testing-library/jest-dom/vitest`.
-  - [ ] Add `apps/web/package.json` script `"test": "vitest run"`. Root `npm test` already runs workspace tests with `--if-present`, so this makes web unit tests part of the local aggregate test command.
-  - [ ] Update `.github/workflows/ci.yml` with an explicit `npm run test --workspace apps/web` step, or replace the separate unit/integration commands with an aggregate command only if API project separation remains visible. Do not add Playwright, axe, contrast, or bundle gates in this story.
+- [x] **Task 1 - Add the web component unit-test harness (AC: 4)**
+  - [x] Add web dev dependencies: `vitest@^4.1.9`, `jsdom@^29.1.1`, `@testing-library/react@^16.3.2`, `@testing-library/dom@^10.4.1`, `@testing-library/user-event@^14.6.1`, and `@testing-library/jest-dom@^6.9.1`.
+  - [x] Add `apps/web/vitest.config.ts` or extend `apps/web/vite.config.ts` with `test: { environment: 'jsdom', setupFiles: ['./src/test/setup.ts'] }`. Keep the existing Vite proxy intact.
+  - [x] Add `apps/web/src/test/setup.ts` importing `@testing-library/jest-dom/vitest`.
+  - [x] Add `apps/web/package.json` script `"test": "vitest run"`. Root `npm test` already runs workspace tests with `--if-present`, so this makes web unit tests part of the local aggregate test command.
+  - [x] Update `.github/workflows/ci.yml` with an explicit `npm run test --workspace apps/web` step, or replace the separate unit/integration commands with an aggregate command only if API project separation remains visible. Do not add Playwright, axe, contrast, or bundle gates in this story.
 
-- [ ] **Task 2 - Create the primitive module structure (AC: 1-4)**
-  - [ ] Add `apps/web/src/components/primitives/`.
-  - [ ] Add `Button.tsx`, `Button.module.css`, `Button.test.tsx`, `TextInput.tsx`, `TextInput.module.css`, `TextInput.test.tsx`, and `index.ts`.
-  - [ ] Export only the two primitives and their prop types from `index.ts`.
-  - [ ] Do not wire these primitives into `App.tsx` or create recipes yet. `CaptureInput`, `TodoItem`, and list rendering are later stories.
+- [x] **Task 2 - Create the primitive module structure (AC: 1-4)**
+  - [x] Add `apps/web/src/components/primitives/`.
+  - [x] Add `Button.tsx`, `Button.module.css`, `Button.test.tsx`, `TextInput.tsx`, `TextInput.module.css`, `TextInput.test.tsx`, and `index.ts`.
+  - [x] Export only the two primitives and their prop types from `index.ts`.
+  - [x] Do not wire these primitives into `App.tsx` or create recipes yet. `CaptureInput`, `TodoItem`, and list rendering are later stories.
 
-- [ ] **Task 3 - Implement `<Button>` (AC: 1, 3, 4)**
-  - [ ] Implement a native `<button>` wrapper; default `type="button"` unless the caller passes another `type`.
-  - [ ] Prop surface must include native `onClick`, `disabled`, `aria-pressed`, `aria-busy`, and `aria-disabled`. Add a small `pending?: boolean` prop only to reflect the story's pending-state requirement; when true, set `aria-busy="true"` and a stable `data-pending="true"` styling hook.
-  - [ ] If `disabled` is true, use native `disabled`. If `pending` or `aria-disabled` is true, preserve focusability unless the caller also passed `disabled`, but guard `onClick` by `preventDefault()` and not calling the handler.
-  - [ ] Accept React 19 refs as a `ref` prop; do not use `forwardRef`.
-  - [ ] Style with CSS Modules and existing design tokens only. Hit area should be at least `var(--row-height-touch)` (48px), which exceeds the >=44px AC; use `--radius-sm`, `--border-width-thin`, `--color-border`, `--color-surface`, `--color-surface-hover`, `--color-accent`, `--color-on-surface-muted`, and motion tokens as needed.
-  - [ ] Do not define `:focus` styles. Use the global `:focus-visible` rule from `global.css`, or if component CSS needs a local rule, it must be exactly `outline: 2px solid var(--color-focus); outline-offset: 2px;` under `:focus-visible`.
+- [x] **Task 3 - Implement `<Button>` (AC: 1, 3, 4)**
+  - [x] Implement a native `<button>` wrapper; default `type="button"` unless the caller passes another `type`.
+  - [x] Prop surface must include native `onClick`, `disabled`, `aria-pressed`, `aria-busy`, and `aria-disabled`. Add a small `pending?: boolean` prop only to reflect the story's pending-state requirement; when true, set `aria-busy="true"` and a stable `data-pending="true"` styling hook.
+  - [x] If `disabled` is true, use native `disabled`. If `pending` or `aria-disabled` is true, preserve focusability unless the caller also passed `disabled`, but guard `onClick` by `preventDefault()` and not calling the handler.
+  - [x] Accept React 19 refs as a `ref` prop; do not use `forwardRef`.
+  - [x] Style with CSS Modules and existing design tokens only. Hit area should be at least `var(--row-height-touch)` (48px), which exceeds the >=44px AC; use `--radius-sm`, `--border-width-thin`, `--color-border`, `--color-surface`, `--color-surface-hover`, `--color-accent`, `--color-on-surface-muted`, and motion tokens as needed.
+  - [x] Do not define `:focus` styles. Use the global `:focus-visible` rule from `global.css`, or if component CSS needs a local rule, it must be exactly `outline: 2px solid var(--color-focus); outline-offset: 2px;` under `:focus-visible`.
 
-- [ ] **Task 4 - Implement `<TextInput>` (AC: 2, 3, 4)**
-  - [ ] Implement a native controlled `<input type="text">` wrapper with `value`, `onChange`, `onSubmit`, `maxLength`, `placeholder`, and `aria-describedby`.
-  - [ ] `onSubmit` fires only on Enter. It receives `value.trim()` after validation; suppress submit for empty/whitespace-only values, and do not clear the input because the caller owns `value`.
-  - [ ] Ignore Enter while IME composition is active (`event.nativeEvent.isComposing`) so partially composed text is not submitted.
-  - [ ] Accept React 19 refs as a `ref` prop; do not use `forwardRef`.
-  - [ ] Style with CSS Modules and existing tokens only. Font size must be `var(--font-size-item)` (16px) to satisfy the iOS zoom prevention rule; use `--row-height-touch`, `--space-*`, `--radius-sm`, `--border-width-thin`, `--color-border`, `--color-surface`, and `--color-on-surface`.
-  - [ ] Do not create label, validation-message, character-counter, or recipe state APIs. Those belong to later recipe stories.
+- [x] **Task 4 - Implement `<TextInput>` (AC: 2, 3, 4)**
+  - [x] Implement a native controlled `<input type="text">` wrapper with `value`, `onChange`, `onSubmit`, `maxLength`, `placeholder`, and `aria-describedby`.
+  - [x] `onSubmit` fires only on Enter. It receives `value.trim()` after validation; suppress submit for empty/whitespace-only values, and do not clear the input because the caller owns `value`.
+  - [x] Ignore Enter while IME composition is active (`event.nativeEvent.isComposing`) so partially composed text is not submitted.
+  - [x] Accept React 19 refs as a `ref` prop; do not use `forwardRef`.
+  - [x] Style with CSS Modules and existing tokens only. Font size must be `var(--font-size-item)` (16px) to satisfy the iOS zoom prevention rule; use `--row-height-touch`, `--space-*`, `--radius-sm`, `--border-width-thin`, `--color-border`, `--color-surface`, and `--color-on-surface`.
+  - [x] Do not create label, validation-message, character-counter, or recipe state APIs. Those belong to later recipe stories.
 
-- [ ] **Task 5 - Unit-test primitive behavior (AC: 1-4)**
-  - [ ] Button tests: renders as a native button; defaults to `type="button"`; forwards ARIA attributes; `disabled` blocks click; `pending` / `aria-disabled` blocks click without requiring native `disabled`; keyboard Tab can focus the button.
-  - [ ] TextInput tests: controlled typing calls `onChange`; `maxLength`, `placeholder`, and `aria-describedby` are forwarded; Enter submits the trimmed value; empty/whitespace Enter does not submit; composing Enter does not submit; keyboard Tab can focus the input.
-  - [ ] Use `userEvent.setup()` for interactions. Import `describe`, `it`, `expect`, and `vi` from `vitest` instead of relying on globals.
-  - [ ] Do not try to assert actual `:focus-visible` rendering in jsdom. The mouse-vs-keyboard focus-ring behavior is satisfied by using `:focus-visible` only plus the existing CSS lint gate; unit tests should prove focusability and operability.
+- [x] **Task 5 - Unit-test primitive behavior (AC: 1-4)**
+  - [x] Button tests: renders as a native button; defaults to `type="button"`; forwards ARIA attributes; `disabled` blocks click; `pending` / `aria-disabled` blocks click without requiring native `disabled`; keyboard Tab can focus the button.
+  - [x] TextInput tests: controlled typing calls `onChange`; `maxLength`, `placeholder`, and `aria-describedby` are forwarded; Enter submits the trimmed value; empty/whitespace Enter does not submit; composing Enter does not submit; keyboard Tab can focus the input.
+  - [x] Use `userEvent.setup()` for interactions. Import `describe`, `it`, `expect`, and `vi` from `vitest` instead of relying on globals.
+  - [x] Do not try to assert actual `:focus-visible` rendering in jsdom. The mouse-vs-keyboard focus-ring behavior is satisfied by using `:focus-visible` only plus the existing CSS lint gate; unit tests should prove focusability and operability.
 
-- [ ] **Task 6 - Verify gates (AC: 1-4)**
-  - [ ] Run `npm run typecheck`.
-  - [ ] Run `npm run lint:css`.
-  - [ ] Run `npm run lint:css:selftest`.
-  - [ ] Run `npm run test --workspace apps/web`.
-  - [ ] Run `npm run test:unit` and `npm run test:integration`.
-  - [ ] Run `npm run build --workspace apps/web`.
+- [x] **Task 6 - Verify gates (AC: 1-4)**
+  - [x] Run `npm run typecheck`.
+  - [x] Run `npm run lint:css`.
+  - [x] Run `npm run lint:css:selftest`.
+  - [x] Run `npm run test --workspace apps/web`.
+  - [x] Run `npm run test:unit` and `npm run test:integration`.
+  - [x] Run `npm run build --workspace apps/web`.
 
 ## Dev Notes
 
@@ -123,16 +123,43 @@ so that recipes compose consistent, keyboard-ready controls without re-implement
 
 ### Agent Model Used
 
-TBD by dev-story workflow.
+GPT-5 Codex
 
 ### Debug Log References
 
+- 2026-06-18: Added failing Button/TextInput tests first; initial `npm run test --workspace apps/web` failed because `./Button` and `./TextInput` did not exist.
+- 2026-06-18: After implementation, web tests initially failed because React Testing Library cleanup was not automatic in this Vitest setup; added explicit `cleanup()` in `apps/web/src/test/setup.ts`.
+- 2026-06-18: API tests initially failed under Node 22 due `better-sqlite3` native module ABI mismatch; reran API and aggregate tests with Node 24.16.0 first in `PATH`, matching repo engine and CI.
+
 ### Completion Notes List
 
+- Added the web Vitest/jsdom/Testing Library harness and CI web component test step.
+- Added `Button` and `TextInput` primitives with native HTML substrates, React 19 `ref` prop support, CSS Modules, existing design tokens, and no app-level wiring.
+- `Button` defaults to `type="button"`, forwards native/ARIA props, reflects pending with `aria-busy` and `data-pending`, and guards clicks for pending or `aria-disabled` without forcing native disabled.
+- `TextInput` is controlled, forwards required input props, submits `value.trim()` only on Enter, suppresses empty submits, and ignores composing Enter.
+- Added unit tests covering focusability, disabled/pending/ARIA-disabled behavior, forwarded props, controlled typing, trimmed submit, empty suppression, and IME composition.
+- Validation passed: `npm run typecheck`; `npm run lint:css`; `npm run lint:css:selftest`; `npm run test --workspace apps/web`; `npm run test:unit` and `npm run test:integration` with Node 24.16.0 first in `PATH`; `npm run build --workspace apps/web`; aggregate `npm test` with Node 24.16.0 first in `PATH`.
+
 ### File List
+
+- `.github/workflows/ci.yml`
+- `_bmad-output/implementation-artifacts/1-4-button-textinput-primitives.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `apps/web/package.json`
+- `apps/web/vite.config.ts`
+- `apps/web/src/components/primitives/Button.module.css`
+- `apps/web/src/components/primitives/Button.test.tsx`
+- `apps/web/src/components/primitives/Button.tsx`
+- `apps/web/src/components/primitives/TextInput.module.css`
+- `apps/web/src/components/primitives/TextInput.test.tsx`
+- `apps/web/src/components/primitives/TextInput.tsx`
+- `apps/web/src/components/primitives/index.ts`
+- `apps/web/src/test/setup.ts`
+- `package-lock.json`
 
 ## Change Log
 
 | Date       | Change |
 |------------|--------|
 | 2026-06-18 | Story 1.4 created; status -> ready-for-dev. |
+| 2026-06-18 | Implemented Button/TextInput primitives, web unit-test harness, tests, and CI web test gate; status -> review. |
