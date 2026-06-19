@@ -11,9 +11,12 @@
     "lint:css": "stylelint \"src/**/*.css\"",
     "lint:css:selftest": "node scripts/verify-token-lint.mjs",
     "test": "vitest run",
+    "contrast:check": "node scripts/check-contrast.mjs",
+    "size:check": "node scripts/check-bundle-size.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },
@@ -27,6 +30,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "axe-core": "^4.12.1",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
@@ -37,6 +41,7 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "vitest-axe": "^0.1.0"
   }
 }

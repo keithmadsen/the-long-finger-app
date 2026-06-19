@@ -1,0 +1,44 @@
+/*
+ * Task row. The whole-row <label> is the tap target (UX-DR13). Checkbox aligns
+ * to the first text line; the description grows to two lines then truncates.
+ */
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: var(--row-height-touch);
+  padding-block: var(--space-2);
+  cursor: pointer;
+  color: var(--color-on-surface);
+}
+
+/*
+ * 2-line truncation (AC 4). The line-clamp box keeps the row height stable per
+ * state: clamp + ellipsis at two lines, regardless of Active/Complete. min-width:0
+ * lets the clamp take effect inside the flex row. -webkit-line-clamp is the
+ * cross-browser-supported clamp idiom; the -webkit- prefixes are required and
+ * intentional (the build has no autoprefixer).
+ */
+.description {
+  flex: 1;
+  min-width: 0;
+  /* stylelint-disable value-no-vendor-prefix, property-no-vendor-prefix -- the -webkit-box line-clamp idiom is the only cross-browser 2-line truncation; no autoprefixer in the build. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  /* stylelint-enable value-no-vendor-prefix, property-no-vendor-prefix */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--font-size-item);
+  line-height: var(--line-height-item);
+}
+
+/*
+ * Complete variant — the two color-independent cues live here (strikethrough +
+ * muted), in addition to the checked checkbox rendered by the primitive. The
+ * strikethrough is what keeps completion legible without color.
+ */
+.complete .description {
+  color: var(--color-on-surface-muted);
+  text-decoration: line-through;
+}

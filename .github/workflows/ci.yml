@@ -6,11 +6,11 @@ on:
     branches: [main]
 
 # Gate set: type-check + the two Vitest projects + the CSS token-name lint
-# (added in Story 1.3 — the first web gate; epics.md Notes 14). Each step fails
-# the build (blocks merge) on failure. The contrast-regression, axe-core,
-# Playwright (forced-colors / reduced-motion / 200%-zoom) and bundle-size gates
-# are deliberately deferred until the rendered list view exists (Story 1.6;
-# epics.md Notes 14/18, C.14).
+# (Story 1.3) + the contrast-regression, axe-core and ratcheting bundle-size
+# gates (Story 1.6 — the rendered list view now exists; epics.md Notes 14/C.14).
+# axe-core runs inside the web Vitest step (App.axe.test.tsx). Each step fails
+# the build (blocks merge) on failure. The Playwright forced-colors /
+# reduced-motion / 200%-zoom gates remain deferred to Epic 3.
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -36,8 +36,17 @@ jobs:
       - name: CSS token-name lint self-test (guards the gate itself)
         run: npm run lint:css:selftest
 
-      - name: Web component tests (Vitest)
+      - name: Web component tests (Vitest, incl. axe-core a11y gate)
         run: npm run test --workspace apps/web
+
+      - name: Contrast-regression gate (token source-of-truth)
+        run: npm run contrast:check --workspace apps/web
+
+      - name: Build web app (production)
+        run: npm run build --workspace apps/web
+
+      - name: Bundle-size gate (ratcheting, gzipped dist)
+        run: npm run size:check --workspace apps/web
 
       - name: Unit tests (Vitest)
         run: npm run test:unit

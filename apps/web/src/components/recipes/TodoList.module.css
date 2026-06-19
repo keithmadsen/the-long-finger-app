@@ -1,0 +1,14 @@
+/*
+ * Single-column task list inside the 640px content column. Reset the native
+ * list affordances (the role="list" on the element keeps the semantics) and
+ * separate rows with pencil-guide divider rules (UX-DR12).
+ */
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list > li + li {
+  border-top: var(--border-width-thin) solid var(--color-divider);
+}
