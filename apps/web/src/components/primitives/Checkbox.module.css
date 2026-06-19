@@ -1,0 +1,97 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+/*
+ * Visually hide the native input while keeping it in the accessibility tree and
+ * fully operable (focus, click, Space). The standard accessible clip pattern —
+ * NOT display:none / visibility:hidden / aria-hidden, all of which would remove
+ * it from the a11y tree. There is no 1px spacing token, so the thin-border
+ * token (1px) supplies the clip box size without a raw px literal.
+ */
+.input {
+  position: absolute;
+  width: var(--border-width-thin);
+  height: var(--border-width-thin);
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-5);
+  height: var(--space-5);
+  border: var(--border-width-thin) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  transition:
+    background-color var(--motion-instant) var(--motion-ease),
+    border-color var(--motion-instant) var(--motion-ease);
+}
+
+/*
+ * Checked cue carried by a foreground checkmark glyph, NOT by background-color
+ * alone — so it survives forced-colors mode (where author backgrounds flatten).
+ * The glyph is present-when-checked / absent-when-unchecked: a structural cue,
+ * not merely a color swap.
+ */
+.indicator::before {
+  content: "✓";
+  font-size: var(--font-size-secondary);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  color: var(--color-surface);
+  opacity: 0;
+}
+
+.input:checked + .indicator {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.input:checked + .indicator::before {
+  opacity: 1;
+}
+
+/*
+ * The native input is visually hidden, so the global :focus-visible ring paints
+ * nothing visible. Translate keyboard focus into a ring on the styled indicator.
+ * This ADDS an outline (it never removes one), so it complies with the
+ * focus-ring lint rule; no bare :focus / unpaired outline:none is used.
+ */
+.input:focus-visible + .indicator {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.input:disabled + .indicator {
+  border-color: var(--color-border);
+  background: var(--color-surface-muted);
+  cursor: not-allowed;
+}
+
+/*
+ * Forced-colors: author colors are replaced by the OS. Pin the checked state to
+ * system colors so the box border and the checkmark glyph stay distinguishable
+ * regardless of the background flattening. System color keywords are forced-
+ * colors primitives (not theme colors), so they are intentionally not tokens —
+ * analogous to the committed vendor-prefix exception in global.css.
+ */
+@media (forced-colors: active) {
+  /* stylelint-disable-next-line color-named -- forced-colors system keywords are not tokens. */
+  .input:checked + .indicator {
+    border-color: Highlight;
+    background: Canvas;
+  }
+
+  /* stylelint-disable-next-line color-named -- forced-colors system keywords are not tokens. */
+  .indicator::before {
+    color: CanvasText;
+  }
+}
