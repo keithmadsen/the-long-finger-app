@@ -1,0 +1,18 @@
+/*
+ * Visually hide the region while keeping it live in the accessibility tree —
+ * v1 has no visible status text, but screen readers must still announce it. The
+ * standard accessible clip pattern; NOT display:none / visibility:hidden /
+ * aria-hidden, any of which would silence the announcement. There is no 1px
+ * spacing token, so the thin-border token (1px) supplies the clip box size
+ * without a raw px literal.
+ */
+.region {
+  position: absolute;
+  width: var(--border-width-thin);
+  height: var(--border-width-thin);
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+  border: 0;
+}
