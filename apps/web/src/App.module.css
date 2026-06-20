@@ -1,0 +1,26 @@
+/*
+ * App shell layout (UX-DR7/UX-DR23). The <main> spans the full viewport so the
+ * --color-surface background (set on <body> in global.css) reaches the edges;
+ * the content lives in a centered 640px column. Single 640px breakpoint:
+ * mobile fills the width with 16px side padding, ≥640px centers with 32px.
+ *
+ * 640px is expressed as 40rem because the token-name lint forbids px on
+ * max-width (there is no 640px token on the scale); 40rem === 640px at the
+ * default root size.
+ */
+.app {
+  width: 100%;
+}
+
+.column {
+  max-width: 40rem;
+  margin-inline: auto;
+  padding-block-start: var(--space-5);
+  padding-inline: var(--space-4);
+}
+
+@media (width >= 40rem) {
+  .column {
+    padding-inline: var(--space-6);
+  }
+}

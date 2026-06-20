@@ -1,0 +1,38 @@
+/*
+ * The empty / loading / failed surfaces. Same calm typography across all three
+ * (16px, regular weight, no italic); each variant adds only what it needs.
+ */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+}
+
+.line {
+  margin: 0;
+  font-size: var(--font-size-item);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-item);
+  color: var(--color-on-surface-muted);
+}
+
+/*
+ * Empty-state line reserves one line-height of vertical space so the layout
+ * does not jump when the list empties out from under it (AC 5, UX-DR22).
+ */
+.reserved {
+  min-height: 1lh;
+}
+
+.error {
+  color: var(--color-error);
+}
+
+/*
+ * The single dashed empty-state divider (decorative — aria-hidden in the DOM).
+ */
+.divider {
+  width: 100%;
+  border-top: var(--border-width-thin) dashed var(--color-divider);
+}
