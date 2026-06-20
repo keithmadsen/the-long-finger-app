@@ -4,7 +4,7 @@ baseline_commit: f5cd853c81660f3c7f93c5112cc9411dccfe031a
 
 # Story 1.6: List view — see your tasks
 
-Status: review
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -87,6 +87,17 @@ so that I always know the current state of my tasks at a glance.
   - [x] `npm run test --workspace apps/web` (includes the new axe test)
   - [x] `npm run test:unit` and `npm run test:integration` (Node 24 first in `PATH` — better-sqlite3 ABI; see Story 1.4/1.5 debug notes)
   - [x] `npm run build --workspace apps/web`
+
+### Review Findings
+
+- [x] [Review][Defer] Contrast gate enforces weaker targets than the story requires — deferred to Story 1.7 color-system correction. AC 9 / Task 8 asks the contrast-regression gate to enforce the documented contrast pairs and targets, including muted text on surface at approximately AAA (~7:1) and muted-vs-active distinction at >=3:1. `apps/web/scripts/check-contrast.mjs` intentionally lowers those thresholds to 4.5 and 2.4 to match the currently committed tokens. This means CI can pass while the specified contrast check would fail. The implementation notes argue the two target values are mutually incompatible with the current token palette, so the color-system correction is explicitly deferred.
+- [ ] [Review][Patch] TodoItem nests a Checkbox label inside the row label [apps/web/src/components/recipes/TodoItem.tsx:39]
+- [ ] [Review][Patch] TodoItem exposes an enabled checkbox with no available toggle behavior [apps/web/src/components/recipes/TodoItem.tsx:40]
+- [ ] [Review][Patch] Malformed successful `/todos` payload can crash rendering instead of entering the load-failed path [apps/web/src/api/todos.ts:21]
+- [ ] [Review][Patch] Background refetch failure can replace an already-loaded list with the failed initial-load surface [apps/web/src/App.tsx:71]
+- [ ] [Review][Patch] Axe accessibility coverage skips the failed-load surface [apps/web/src/App.axe.test.tsx:47]
+- [ ] [Review][Patch] Completed TodoItem tests do not prove the strikethrough and muted-style CSS contract [apps/web/src/components/recipes/TodoItem.test.tsx:42]
+- [ ] [Review][Patch] Bundle-size gate should fail clearly when no JS/CSS assets are found or the baseline shape is invalid [apps/web/scripts/check-bundle-size.mjs:58]
 
 ## Dev Notes
 
