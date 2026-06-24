@@ -12,17 +12,20 @@
  * pair below target. Mirrors scripts/verify-token-lint.mjs (a standalone node
  * gate, zero extra tooling).
  *
- * Targets are RATCHETED to the WCAG levels the committed tokens actually achieve
- * (a regression floor), not the aspirational figures in the UX spec's Contrast
- * verification table. Two spec figures are NOT met by the committed tokens and
- * are in fact mutually exclusive (see Story 1.6 Dev Agent Record):
- *   - muted text on surface: spec "~7.1:1 (AAA)" vs committed 6.71:1 (AA-grade).
- *   - muted-vs-active distinction: spec "≥3:1" vs committed 2.48:1.
- * A single --color-on-surface-muted value cannot be both AAA-dark on the light
- * surface AND ≥3:1 distinct from the near-black on-surface text. Resolving that
- * is a color-system decision deferred to Story 1.7 (when the pending state, the
- * only consumer of the distinction, is built). This gate locks the current
- * achieved ratios so the tokens cannot silently regress in the meantime.
+ * Targets are the documented WCAG levels (a regression floor). The Story 1.6
+ * contradiction — a single --color-on-surface-muted cannot be both AAA-dark on
+ * the light surface AND ≥3:1 distinct from near-black on-surface text — is
+ * RESOLVED in Story 1.7 by a dedicated --color-pending token used only by the
+ * pending row. The distinction is now measured against that token at its real
+ * ≥3:1 target (AC 16), not the weakened 2.4 floor 1.6 had to settle for:
+ *   - --color-pending vs --color-on-surface ≥3:1 (pending-vs-settled is now
+ *     perceptible — the real target, no silent weakening).
+ *   - --color-pending on --color-surface ≥4.5:1 (AA legibility; AA-not-AAA is
+ *     acceptable for transient pending text because aria-busy carries the
+ *     semantic).
+ * --color-on-surface-muted keeps its AAA-grade role for completed/secondary text
+ * (NOT regressed to make room for the distinction). The muted-on-surface figure
+ * stays at its committed AA floor (6.71:1; spec aspired AAA ~7.1:1).
  */
 
 import { readFileSync } from 'node:fs'
@@ -113,14 +116,21 @@ const PAIRS = [
     label: 'error text on surface (AA)',
   },
   {
-    // Pending-vs-settled distinction. Spec wants ≥3:1 but the committed muted
-    // token only reaches 2.48:1, and ≥3:1 here is mutually exclusive with AAA
-    // muted-on-surface (header). Floored at 2.4 to lock the current value and
-    // catch regressions; the real ≥3:1 fix lands with the Story 1.7 pending UI.
-    fg: '--color-on-surface-muted',
+    // Pending-vs-settled distinction, now measured on the dedicated --color-pending
+    // token at its REAL ≥3:1 target (Story 1.7 AC 16). Replaces the weakened 2.4
+    // floor 1.6 had to settle for; the pending color shift is perceptible.
+    fg: '--color-pending',
     bg: '--color-on-surface',
-    target: 2.4,
-    label: 'muted-vs-active distinction (ratcheted 2.4; spec target 3:1 — see 1.7)',
+    target: 3,
+    label: 'pending-vs-settled distinction (≥3:1 — Story 1.7 resolution)',
+  },
+  {
+    // Pending text must stay legible on the surface. AA (not AAA) is acceptable
+    // for this transient text because aria-busy carries the semantic.
+    fg: '--color-pending',
+    bg: '--color-surface',
+    target: 4.5,
+    label: 'pending text on surface (AA)',
   },
 ]
 

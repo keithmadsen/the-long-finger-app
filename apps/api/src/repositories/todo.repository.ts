@@ -45,17 +45,22 @@ export function todoRepository({ db }: Dependencies) {
   // Server stamps both timestamps to the same value; `completed` starts 0.
   // Any client-supplied timestamp is impossible to leak — CreateTodoBody is
   // exactly { id, description } (AC 7). Idempotent on `id`: a duplicate insert
-  // is a no-op and returns the EXISTING row, no second row, no throw (AC 8).
-  function insertTodo(input: CreateTodoBody): Todo {
+  // is a no-op and returns the EXISTING row, no second row, no throw.
+  //
+  // Returns `created` so the route can map new vs. existing → 201 vs. 200
+  // (Story 1.7 AC 11). `INSERT … ON CONFLICT(id) DO NOTHING` reports
+  // `changes === 0` when the id already existed; that is the sole signal —
+  // the SQL itself is unchanged (still a no-op on conflict, never an overwrite).
+  function insertTodo(input: CreateTodoBody): { todo: Todo; created: boolean } {
     const now = new Date().toISOString();
-    insertStatement.run({
+    const result = insertStatement.run({
       id: input.id,
       description: input.description,
       created_at: now,
       updated_at: now,
     });
     const row = findByIdStatement.get(input.id) as TodoRow;
-    return toDomain(row);
+    return { todo: toDomain(row), created: result.changes > 0 };
   }
 
   return { listTodos, insertTodo };

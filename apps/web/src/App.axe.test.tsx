@@ -1,5 +1,6 @@
 import type { Todo } from '@tlf/contracts'
 import { screen, waitForElementToBeRemoved } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import * as axeMatchers from 'vitest-axe/matchers'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -72,6 +73,52 @@ describe('App accessibility (axe-core)', () => {
     const { container } = renderWithClient(<App />)
     // Wait for the loading line to be replaced by the empty surface.
     await waitForElementToBeRemoved(() => screen.queryByText('Loading…'))
+
+    const results = await axe(container, {
+      rules: { 'color-contrast': { enabled: false } },
+    })
+
+    expect(results).toHaveNoViolations()
+  })
+
+  it('has no serious/critical violations in the failed-load state (Story 1.7)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('', { status: 500 })),
+    )
+
+    const { container } = renderWithClient(<App />)
+    await screen.findByRole('button', { name: 'Retry' })
+
+    const results = await axe(container, {
+      rules: { 'color-contrast': { enabled: false } },
+    })
+
+    expect(results).toHaveNoViolations()
+  })
+
+  it('has no serious/critical violations with a PENDING create row (aria-busy) (Story 1.7)', async () => {
+    const user = userEvent.setup()
+    // Never-resolving POST so the row stays pending (aria-busy) during the scan.
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (!init || init.method === undefined || init.method === 'GET') {
+        return new Response(JSON.stringify([]), { status: 200 })
+      }
+      return new Promise<Response>(() => {})
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { container } = renderWithClient(<App />)
+    await screen.findByText('Your list will appear here.')
+
+    await user.type(
+      screen.getByPlaceholderText('What do you want to do?'),
+      'A pending task',
+    )
+    await user.keyboard('{Enter}')
+
+    // The optimistic pending row (aria-busy from t=0) is now in the tree.
+    await screen.findByRole('listitem')
 
     const results = await axe(container, {
       rules: { 'color-contrast': { enabled: false } },

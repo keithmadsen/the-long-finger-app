@@ -144,6 +144,184 @@ describe('durability across a real process restart (AC 9, FR-9)', () => {
   });
 });
 
+describe('POST /todos create path (201 new / 200 existing) (Story 1.7 AC 2, 11)', () => {
+  let ctx: TestApp;
+
+  beforeAll(async () => {
+    ctx = await buildTestApp();
+  });
+
+  afterAll(async () => {
+    await ctx.cleanup();
+  });
+
+  // Two valid UUIDv7 ids (version nibble = 7, variant nibble ∈ 8/9/a/b).
+  const ID_A = '0190ff8c-3e5a-7c1d-8b2e-1a2b3c4d5e6f';
+  const ID_B = '0190ff8c-3e5a-7c1d-8b2e-1a2b3c4d5e70';
+
+  it('201 creates a Todo (camelCase, completed:false, equal timestamps) and GET includes it (AC 2)', async () => {
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: '/todos',
+      payload: { id: ID_A, description: 'Buy milk' },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = res.json();
+    expect(body).toEqual({
+      id: ID_A,
+      description: 'Buy milk',
+      completed: false,
+      createdAt: expect.any(String),
+      updatedAt: expect.any(String),
+    });
+    // Server stamps both timestamps to the same value on create.
+    expect(body.createdAt).toBe(body.updatedAt);
+
+    const list = await ctx.app.inject({ method: 'GET', url: '/todos' });
+    expect(list.json()).toContainEqual(
+      expect.objectContaining({ id: ID_A, description: 'Buy milk' }),
+    );
+  });
+
+  it('200 on a duplicate id returns the EXISTING Todo with no second row (idempotency, AC 11)', async () => {
+    const first = await ctx.app.inject({
+      method: 'POST',
+      url: '/todos',
+      payload: { id: ID_B, description: 'Original description' },
+    });
+    expect(first.statusCode).toBe(201);
+
+    // Re-POST the SAME id with a different description (e.g. a timeout retry).
+    const second = await ctx.app.inject({
+      method: 'POST',
+      url: '/todos',
+      payload: { id: ID_B, description: 'Different on retry' },
+    });
+
+    // The conflict is a no-op, not an overwrite: 200 + the FIRST description.
+    expect(second.statusCode).toBe(200);
+    expect(second.json()).toEqual(
+      expect.objectContaining({ id: ID_B, description: 'Original description' }),
+    );
+
+    // Exactly one row for that id.
+    const list = await ctx.app.inject({ method: 'GET', url: '/todos' });
+    const matches = (list.json() as { id: string }[]).filter((t) => t.id === ID_B);
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toEqual(
+      expect.objectContaining({ description: 'Original description' }),
+    );
+  });
+});
+
+describe('POST /todos boundary validation (400 envelope) (Story 1.7 AC 2, 3, 11)', () => {
+  let ctx: TestApp;
+
+  beforeAll(async () => {
+    ctx = await buildTestApp();
+  });
+
+  afterAll(async () => {
+    await ctx.cleanup();
+  });
+
+  const VALID_ID = '0190ff8c-3e5a-7c1d-8b2e-1a2b3c4d5e71';
+
+  function expectBadRequest(res: { statusCode: number; json: () => unknown }) {
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({
+      error: {
+        code: 'BAD_REQUEST',
+        message: expect.any(String),
+        details: expect.anything(),
+      },
+    });
+  }
+
+  it('rejects an empty description (AC 3)', async () => {
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: '/todos',
+      payload: { id: VALID_ID, description: '' },
+    });
+    expectBadRequest(res);
+  });
+
+  it('rejects a >200-char description (AC 3)', async () => {
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: '/todos',
+      payload: { id: VALID_ID, description: 'x'.repeat(201) },
+    });
+    expectBadRequest(res);
+  });
+
+  it('rejects a missing id (AC 2)', async () => {
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: '/todos',
+      payload: { description: 'No id supplied' },
+    });
+    expectBadRequest(res);
+  });
+
+  it('rejects a malformed (non-UUIDv7) id (AC 2)', async () => {
+    const res = await ctx.app.inject({
+      method: 'POST',
+      url: '/todos',
+      // A v4 uuid: version nibble is 4, not 7 — must be rejected by the pattern.
+      payload: { id: '11111111-1111-4111-8111-111111111111', description: 'Bad id' },
+    });
+    expectBadRequest(res);
+  });
+});
+
+describe('POST /todos concurrent submits (AC 10)', () => {
+  let ctx: TestApp;
+
+  beforeAll(async () => {
+    ctx = await buildTestApp();
+  });
+
+  afterAll(async () => {
+    await ctx.cleanup();
+  });
+
+  it('all distinct-id submits fired together succeed and all persist (AC 10)', async () => {
+    // Distinct valid UUIDv7 ids; the synchronous better-sqlite3 backend
+    // serializes the writes — this asserts correctness/independence, NOT
+    // parallel execution.
+    const ids = [
+      '0190ff8c-3e5a-7c1d-8b2e-1a2b3c4d5e81',
+      '0190ff8c-3e5a-7c1d-8b2e-1a2b3c4d5e82',
+      '0190ff8c-3e5a-7c1d-8b2e-1a2b3c4d5e83',
+      '0190ff8c-3e5a-7c1d-8b2e-1a2b3c4d5e84',
+      '0190ff8c-3e5a-7c1d-8b2e-1a2b3c4d5e85',
+    ];
+
+    const results = await Promise.all(
+      ids.map((id, i) =>
+        ctx.app.inject({
+          method: 'POST',
+          url: '/todos',
+          payload: { id, description: `Concurrent ${i}` },
+        }),
+      ),
+    );
+
+    for (const res of results) {
+      expect(res.statusCode).toBe(201);
+    }
+
+    const list = await ctx.app.inject({ method: 'GET', url: '/todos' });
+    const persistedIds = (list.json() as { id: string }[]).map((t) => t.id);
+    for (const id of ids) {
+      expect(persistedIds).toContain(id);
+    }
+  });
+});
+
 describe('OpenAPI document (AC 10)', () => {
   let ctx: TestApp;
 
@@ -161,9 +339,15 @@ describe('OpenAPI document (AC 10)', () => {
     const components = doc.components as { schemas?: Record<string, unknown> };
 
     expect(paths['/todos']).toBeDefined();
+    const todosPath = paths['/todos'] as Record<string, unknown>;
+    // Both GET and POST operations are documented (Story 1.7 adds POST).
+    expect(todosPath.get).toBeDefined();
+    expect(todosPath.post).toBeDefined();
     expect(JSON.stringify(paths['/todos'])).toContain('Todo');
+    expect(JSON.stringify(paths['/todos'])).toContain('CreateTodoBody');
     expect(JSON.stringify(paths['/todos'])).toContain('ErrorEnvelope');
     expect(components.schemas?.Todo).toBeDefined();
+    expect(components.schemas?.CreateTodoBody).toBeDefined();
     expect(components.schemas?.ErrorEnvelope).toBeDefined();
   });
 });

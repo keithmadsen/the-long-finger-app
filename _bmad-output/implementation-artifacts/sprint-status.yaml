@@ -66,6 +66,8 @@ project: the long finger
 # 2026-06-20: 1-6 → in-progress (code-review action items)
 # 2026-06-22: 1-6 → done + merged to main (PR #8)
 # 2026-06-22: 1-7 → ready-for-dev (create-story)
+# 2026-06-22: 1-7 → in-progress (dev-story)
+# 2026-06-23: 1-7 → review (dev-story complete)
 project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"
@@ -79,7 +81,7 @@ development_status:
   1-4-button-textinput-primitives: done
   1-5-checkbox-liveregion-primitives: done
   1-6-list-view-see-your-tasks: done
-  1-7-capture-and-confirm-add-a-task: ready-for-dev
+  1-7-capture-and-confirm-add-a-task: review
   1-8-complete-uncomplete-a-task: backlog
   1-9-failed-create-recovery: backlog
   1-10-unread-error-indicator: backlog

@@ -1,4 +1,4 @@
-import type { Todo } from '@tlf/contracts'
+import type { CreateTodoBody, Todo } from '@tlf/contracts'
 
 /*
  * The ONLY place the network is touched for the read path (architecture.md
@@ -19,4 +19,33 @@ export async function getTodos(): Promise<Todo[]> {
   }
 
   return (await response.json()) as Todo[]
+}
+
+/*
+ * The write counterpart: create a todo from a client-generated UUIDv7 `id` +
+ * description. POSTs JSON through the same Vite proxy. The server is idempotent
+ * on `id` (201 new / 200 existing) — both are success here; the client already
+ * owns the final id so there is no reconciliation, the settle is the cache
+ * invalidation (useCreateTodo onSettled), not this response body.
+ *
+ * Throws on a non-OK response AND on a malformed success body, so either failure
+ * routes to the mutation's onError (which rolls the pending row back) rather than
+ * crashing the render — mirrors the read-path malformed-payload guard.
+ */
+export async function createTodo(body: CreateTodoBody): Promise<Todo> {
+  const response = await fetch('/todos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: body.id, description: body.description }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`POST /todos failed: ${response.status}`)
+  }
+
+  try {
+    return (await response.json()) as Todo
+  } catch {
+    throw new Error('POST /todos returned a malformed response body')
+  }
 }

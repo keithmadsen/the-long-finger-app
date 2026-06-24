@@ -31,6 +31,20 @@
   text-overflow: ellipsis;
   font-size: var(--font-size-item);
   line-height: var(--line-height-item);
+  /* Pending→settled colour fade (AC 6); collapses to 0 under reduced-motion. */
+  transition: color var(--motion-settle) var(--motion-ease);
+}
+
+/*
+ * Pending variant (Story 1.7) — a CONTRAST SHIFT ONLY: the description text
+ * resolves to --color-pending (≥3:1 distinct from settled text, AC 16). No
+ * spinner, shimmer, italic, weight, size or position change, so the row height
+ * is identical to Active (AC 6, UX-DR22). Under prefers-contrast: more the token
+ * collapses to --color-on-surface (handled in tokens.css) and aria-busy carries
+ * the signal alone.
+ */
+.pending .description {
+  color: var(--color-pending);
 }
 
 /*

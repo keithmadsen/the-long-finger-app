@@ -5,6 +5,8 @@ import styles from './TodoList.module.css'
 
 export interface TodoListProps {
   todos: Todo[]
+  /** Ids whose create is in-flight — each maps to a Pending <TodoItem> (1.7). */
+  pendingIds?: ReadonlySet<string>
 }
 
 /*
@@ -20,11 +22,15 @@ export interface TodoListProps {
  * <ul> already carries the list role; the explicit role="list" guards against
  * the list-role being stripped when list-style is removed in some browsers.
  */
-export function TodoList({ todos }: TodoListProps) {
+export function TodoList({ todos, pendingIds }: TodoListProps) {
   return (
     <ul className={styles.list} role="list">
       {todos.map((todo) => (
-        <TodoItem key={todo.id} todo={todo} />
+        <TodoItem
+          key={todo.id}
+          pending={pendingIds?.has(todo.id) ?? false}
+          todo={todo}
+        />
       ))}
     </ul>
   )
