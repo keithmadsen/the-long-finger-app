@@ -47,12 +47,10 @@ function App() {
     liveRegionRef.current?.announce(message)
   }, [])
 
-  // "Has the user created a task this session?" Drives the instruction-line
-  // lifecycle (AC 1, 14): the line shows ONLY before the first task and never
-  // reappears once a task has been created — even if the list later empties. It
-  // is latched in the create-success callback (below), not a data-watching
-  // effect. The instruction line only ever renders in the empty surface, so a
-  // session that loads with existing todos simply never shows it.
+  // "Has this session ever observed/created a task?" Drives the instruction-line
+  // lifecycle (AC 1, 14): the line shows ONLY for a never-seen-empty list and
+  // never reappears once any todo has existed, including seeded lists loaded from
+  // the server.
   const [hasEverHadTodos, setHasEverHadTodos] = useState(false)
 
   const { submit, pendingIds } = useCreateTodo({
@@ -81,9 +79,21 @@ function App() {
     }
   }, [isError])
 
+  const currentTodosCount = data?.length ?? 0
+  const shouldShowInstruction = !hasEverHadTodos && currentTodosCount === 0
+
+  useEffect(() => {
+    if (currentTodosCount > 0) {
+      // Latch seeded/non-empty server lists so the first-task instruction cannot
+      // reappear after a later refetch returns empty.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- this is a session latch derived from async query data, not synchronously derivable initial state.
+      setHasEverHadTodos(true)
+    }
+  }, [currentTodosCount])
+
   const instructionWrapClass = [
     styles['instruction-wrap'],
-    hasEverHadTodos ? styles['instruction-hidden'] : null,
+    shouldShowInstruction ? null : styles['instruction-hidden'],
   ]
     .filter(Boolean)
     .join(' ')
@@ -108,7 +118,7 @@ function App() {
              * layout jump. aria-hidden once retired so it leaves the a11y tree.
              */}
             <div
-              aria-hidden={hasEverHadTodos || undefined}
+              aria-hidden={!shouldShowInstruction || undefined}
               className={instructionWrapClass}
             >
               <p className={styles.instruction}>{INSTRUCTION_LINE}</p>

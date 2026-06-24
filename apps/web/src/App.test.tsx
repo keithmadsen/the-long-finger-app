@@ -73,6 +73,7 @@ describe('App', () => {
     await waitFor(() =>
       expect(document.title).toBe('the long finger (2 active)'),
     )
+    expect(instructionWrap()).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('omits the count from the title when zero tasks are active (AC 7)', async () => {

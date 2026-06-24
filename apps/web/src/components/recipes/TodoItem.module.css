@@ -31,8 +31,6 @@
   text-overflow: ellipsis;
   font-size: var(--font-size-item);
   line-height: var(--line-height-item);
-  /* Pending→settled colour fade (AC 6); collapses to 0 under reduced-motion. */
-  transition: color var(--motion-settle) var(--motion-ease);
 }
 
 /*
@@ -55,4 +53,13 @@
 .complete .description {
   color: var(--color-on-surface-muted);
   text-decoration: line-through;
+}
+
+/*
+ * Pending must appear as a non-flashing swap once the honest-pending threshold
+ * fires, so the pending onset has NO transition. Only the settle back to normal
+ * fades via --motion-settle (reduced motion collapses the token to 0).
+ */
+.item:not(.pending) .description {
+  transition: color var(--motion-settle) var(--motion-ease);
 }

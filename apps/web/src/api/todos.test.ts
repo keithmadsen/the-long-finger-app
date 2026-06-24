@@ -72,4 +72,17 @@ describe('createTodo', () => {
 
     await expect(createTodo(BODY)).rejects.toThrow()
   })
+
+  it('rejects a 2xx body that is JSON but not a Todo shape', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () => new Response(JSON.stringify({ id: BODY.id }), { status: 201 }),
+      ),
+    )
+
+    await expect(createTodo(BODY)).rejects.toThrow(
+      'POST /todos returned a malformed response body',
+    )
+  })
 })

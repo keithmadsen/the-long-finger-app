@@ -4,7 +4,7 @@ baseline_commit: 3334e45b7f47b8e44ffe8a2b36f29ae31659ec08
 
 # Story 1.7: Capture-and-confirm — add a task
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -125,6 +125,12 @@ so that capturing a task is immediate and I'm never left wondering whether it sa
   - [x] `npm run test --workspace apps/web` (includes axe, first-interactive, and the new pending/create tests). Add the failed-load + (now) pending surfaces to the axe coverage if not already present.
   - [x] `npm run test:unit` and `npm run test:integration` (**Node 24 first in PATH** — better-sqlite3 ABI).
   - [x] `npm run build --workspace apps/web`; Playwright e2e if scaffolded.
+
+### Review Findings
+
+- [x] [Review][Patch] Instruction line is visible for seeded/non-empty lists [apps/web/src/App.tsx:56]
+- [x] [Review][Patch] Successful `POST /todos` JSON is cast, not shape-validated [apps/web/src/api/todos.ts:46]
+- [x] [Review][Patch] Pending visual onset uses `--motion-settle` instead of the required non-flashing swap [apps/web/src/components/recipes/TodoItem.module.css:34]
 
 ## Dev Notes
 

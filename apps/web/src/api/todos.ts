@@ -1,4 +1,5 @@
-import type { CreateTodoBody, Todo } from '@tlf/contracts'
+import { Value } from '@sinclair/typebox/value'
+import { todoSchema, type CreateTodoBody, type Todo } from '@tlf/contracts'
 
 /*
  * The ONLY place the network is touched for the read path (architecture.md
@@ -44,7 +45,11 @@ export async function createTodo(body: CreateTodoBody): Promise<Todo> {
   }
 
   try {
-    return (await response.json()) as Todo
+    const parsed: unknown = await response.json()
+    if (!Value.Check(todoSchema, parsed)) {
+      throw new Error('POST /todos returned a malformed response body')
+    }
+    return parsed as Todo
   } catch {
     throw new Error('POST /todos returned a malformed response body')
   }

@@ -106,6 +106,7 @@ describe('TodoItem', () => {
       expect(row.querySelector('[role="progressbar"]')).toBeNull()
       expect(row.querySelector('[role="status"]')).toBeNull()
     })
+
   })
 
   it('applies the 2-line line-clamp markup to a long description (AC 4)', () => {
