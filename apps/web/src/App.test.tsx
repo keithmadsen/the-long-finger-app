@@ -1,5 +1,5 @@
 import type { Todo } from '@tlf/contracts'
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -7,6 +7,16 @@ import App from './App'
 import { renderWithClient } from './test/queryClient'
 
 const LOAD_FAILURE_MESSAGE = 'Couldn’t load your list. Refresh to try again.'
+const INSTRUCTION_LINE = 'Type a task and press Enter to add it to your list.'
+const CAPTURE_PLACEHOLDER = 'What do you want to do?'
+
+// The instruction line stays MOUNTED but retires via aria-hidden + a CSS collapse
+// once a task exists (AC 14). aria-hidden="true" on its wrapper is the signal.
+function instructionWrap(): HTMLElement {
+  const wrap = screen.getByText(INSTRUCTION_LINE).parentElement
+  if (!wrap) throw new Error('instruction wrapper not found')
+  return wrap
+}
 
 function todo(overrides: Partial<Todo> = {}): Todo {
   return {
@@ -63,6 +73,7 @@ describe('App', () => {
     await waitFor(() =>
       expect(document.title).toBe('the long finger (2 active)'),
     )
+    expect(instructionWrap()).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('omits the count from the title when zero tasks are active (AC 7)', async () => {
@@ -128,5 +139,93 @@ describe('App', () => {
     expect(await screen.findByRole('list')).toBeInTheDocument()
     expect(screen.getByText('now loaded')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('App capture-and-confirm (Story 1.7)', () => {
+  beforeEach(() => {
+    document.title = ''
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  // A stateful server double: GET returns the current list; POST creates and
+  // makes the subsequent GET (invalidation refetch) return the new task.
+  function stubServer(initial: Todo[] = []) {
+    let serverTodos = [...initial]
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (!init || init.method === undefined || init.method === 'GET') {
+        return okResponse(serverTodos)
+      }
+      const body = JSON.parse(init.body as string) as {
+        id: string
+        description: string
+      }
+      const created: Todo = {
+        id: body.id,
+        description: body.description,
+        completed: false,
+        createdAt: '2026-06-23T13:00:00.000Z',
+        updatedAt: '2026-06-23T13:00:00.000Z',
+      }
+      serverTodos = [created, ...serverTodos]
+      return new Response(JSON.stringify(created), { status: 201 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  it('shows the instruction line on first open, retires it after the first task, and announces "{description} added." once (AC 1, 9, 14)', async () => {
+    const user = userEvent.setup()
+    stubServer([])
+    renderWithClient(<App />)
+
+    // First open (never created): the instruction line is visible (not retired).
+    await screen.findByText('Your list will appear here.')
+    expect(instructionWrap()).not.toHaveAttribute('aria-hidden', 'true')
+
+    // Capture a task.
+    await user.type(
+      screen.getByPlaceholderText(CAPTURE_PLACEHOLDER),
+      'Walk the dog',
+    )
+    await user.keyboard('{Enter}')
+
+    // The instruction line retires (it stays mounted but goes aria-hidden).
+    await waitFor(() =>
+      expect(instructionWrap()).toHaveAttribute('aria-hidden', 'true'),
+    )
+
+    // The confirmation is announced exactly once via the single LiveRegion.
+    const status = screen.getByRole('status')
+    await waitFor(() =>
+      expect(status).toHaveTextContent('Walk the dog added.'),
+    )
+  })
+
+  it('does NOT bring the instruction line back when the list later empties (AC 14)', async () => {
+    const user = userEvent.setup()
+    stubServer([])
+    const { client } = renderWithClient(<App />)
+
+    await screen.findByText('Your list will appear here.')
+    await user.type(
+      screen.getByPlaceholderText(CAPTURE_PLACEHOLDER),
+      'A task',
+    )
+    await user.keyboard('{Enter}')
+
+    await waitFor(() =>
+      expect(instructionWrap()).toHaveAttribute('aria-hidden', 'true'),
+    )
+
+    // Simulate the list returning to empty (e.g. a future delete). The
+    // instruction line must NOT reappear — only the persistent empty-state line.
+    act(() => client.setQueryData<Todo[]>(['todos'], []))
+
+    expect(await screen.findByText('Your list will appear here.')).toBeInTheDocument()
+    expect(instructionWrap()).toHaveAttribute('aria-hidden', 'true')
   })
 })

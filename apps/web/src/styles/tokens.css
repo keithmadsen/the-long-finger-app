@@ -19,7 +19,18 @@
   --color-surface-muted: #f0efea; /* Separators, empty-state surface, hover bg. */
   --color-surface-hover: #f5f4ef; /* Desktop hover on interactive rows. */
   --color-on-surface: #1a1a18; /* Active/primary text; near-black with warmth. */
-  --color-on-surface-muted: #5a5954; /* Completed/pending/secondary text. */
+  --color-on-surface-muted: #5a5954; /* Completed/secondary text (AAA on surface). */
+  /*
+   * Pending-row text ONLY (Story 1.7). A dedicated token that decouples the
+   * pending-vs-settled distinction from the completed-text muted token, resolving
+   * the Story 1.6 contradiction (a single muted grey cannot be BOTH AAA-dark on
+   * surface AND ≥3:1 distinct from near-black on-surface text). Tuned so it is
+   * simultaneously ≥3:1 vs --color-on-surface (settled text → the pending shift
+   * is perceptible, AC 16) AND ≥4.5:1 (AA) on --color-surface (legible). AA-not-
+   * AAA on surface is acceptable here because aria-busy carries the semantic for
+   * this transient text. Measured: 3.36:1 vs on-surface, 4.96:1 on surface.
+   */
+  --color-pending: #6e6d67;
 
   /* ---- Accents, borders, focus, error --------------------------------- */
   --color-border: #dddcd5; /* Form-control borders (TextInput, Checkbox). */
@@ -77,6 +88,27 @@
 @media (prefers-contrast: more) {
   :root {
     --color-on-surface-muted: var(--color-on-surface);
+    /*
+     * Pending text collapses to full contrast too: the visual pending-vs-settled
+     * distinction disappears and the signal rests on aria-busy alone (UX spec
+     * lines 488–494). The non-color cue is the honest carrier here.
+     */
+    --color-pending: var(--color-on-surface);
+  }
+}
+
+/*
+ * Reduced motion — honour the preference by collapsing the TIMED motion tokens
+ * to zero (the token comments above promise this). --motion-none is already 0
+ * regardless of preference (the honest-pending swap must never animate). Because
+ * components reference these tokens, every transition built on them — the
+ * pending→settled colour fade (Story 1.7), the instruction-line fade — collapses
+ * here with NO per-component media query and no layout jump.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-instant: 0ms;
+    --motion-settle: 0ms;
   }
 }
 

@@ -24,3 +24,37 @@
     padding-inline: var(--space-6);
   }
 }
+
+/*
+ * Instruction line (Story 1.7 AC 1, 14). Shown above the input before the first
+ * task, then RETIRED via a fade + collapse rather than an abrupt removal.
+ *
+ * The wrapper is a single-row grid; collapsing the track 1fr→0fr animates the
+ * height to zero while opacity fades, both on --motion-settle. The line stays
+ * mounted-but-collapsed (never reappears). Reduced motion collapses the token to
+ * 0ms (tokens.css) → instant, no layout jump. The child clips via overflow so
+ * its padding collapses with the track.
+ */
+.instruction-wrap {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows var(--motion-settle) var(--motion-ease),
+    opacity var(--motion-settle) var(--motion-ease);
+}
+
+.instruction-hidden {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.instruction {
+  min-height: 0;
+  margin: 0;
+  padding-block-end: var(--space-3);
+  overflow: hidden;
+  font-size: var(--font-size-item);
+  line-height: var(--line-height-item);
+  color: var(--color-on-surface-muted);
+}

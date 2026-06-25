@@ -25,7 +25,9 @@ function seed(
 describe('@tlf/contracts surface (AC 1)', () => {
   it('exports the TypeBox schemas, with stable $id components and derived types', () => {
     expect(todoSchema).toEqual(expect.objectContaining({ $id: 'Todo', type: 'object' }));
-    expect(createTodoBody).toEqual(expect.objectContaining({ type: 'object' }));
+    expect(createTodoBody).toEqual(
+      expect.objectContaining({ $id: 'CreateTodoBody', type: 'object' }),
+    );
     expect(patchTodoBody).toEqual(expect.objectContaining({ type: 'object' }));
     expect(errorEnvelope).toEqual(expect.objectContaining({ $id: 'ErrorEnvelope', type: 'object' }));
   });
@@ -93,12 +95,13 @@ describe('todoRepository', () => {
     db.close();
   });
 
-  it('insertTodo() stamps equal server timestamps and starts incomplete (AC 7)', () => {
+  it('insertTodo() stamps equal server timestamps, starts incomplete, reports created (AC 7; 1.7 AC 11)', () => {
     const { db, repo } = repoWithMemoryDb();
     const input: CreateTodoBody = { id: 'inserted', description: 'Server stamped' };
 
-    const todo = repo.insertTodo(input);
+    const { todo, created } = repo.insertTodo(input);
 
+    expect(created).toBe(true);
     expect(todo).toEqual({
       id: 'inserted',
       description: 'Server stamped',
@@ -110,7 +113,7 @@ describe('todoRepository', () => {
     db.close();
   });
 
-  it('insertTodo() is idempotent on id — duplicate returns the existing row (AC 8)', () => {
+  it('insertTodo() is idempotent on id — duplicate returns existing row with created:false (AC 8; 1.7 AC 11)', () => {
     const { db, repo } = repoWithMemoryDb();
 
     const first = repo.insertTodo({ id: 'same-id', description: 'Original' });
@@ -119,7 +122,13 @@ describe('todoRepository', () => {
       count: number;
     };
 
-    expect(second).toEqual(first);
+    // First insert created the row; the duplicate is a no-op (created:false)
+    // and returns the EXISTING row verbatim — the original description, not the
+    // retry's. This created-vs-existing signal is what the route maps to 201/200.
+    expect(first.created).toBe(true);
+    expect(second.created).toBe(false);
+    expect(second.todo).toEqual(first.todo);
+    expect(second.todo.description).toBe('Original');
     expect(count.count).toBe(1);
     db.close();
   });

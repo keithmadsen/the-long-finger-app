@@ -34,6 +34,18 @@
 }
 
 /*
+ * Pending variant (Story 1.7) — a CONTRAST SHIFT ONLY: the description text
+ * resolves to --color-pending (≥3:1 distinct from settled text, AC 16). No
+ * spinner, shimmer, italic, weight, size or position change, so the row height
+ * is identical to Active (AC 6, UX-DR22). Under prefers-contrast: more the token
+ * collapses to --color-on-surface (handled in tokens.css) and aria-busy carries
+ * the signal alone.
+ */
+.pending .description {
+  color: var(--color-pending);
+}
+
+/*
  * Complete variant — the two color-independent cues live here (strikethrough +
  * muted), in addition to the checked checkbox rendered by the primitive. The
  * strikethrough is what keeps completion legible without color.
@@ -41,4 +53,13 @@
 .complete .description {
   color: var(--color-on-surface-muted);
   text-decoration: line-through;
+}
+
+/*
+ * Pending must appear as a non-flashing swap once the honest-pending threshold
+ * fires, so the pending onset has NO transition. Only the settle back to normal
+ * fades via --motion-settle (reduced motion collapses the token to 0).
+ */
+.item:not(.pending) .description {
+  transition: color var(--motion-settle) var(--motion-ease);
 }

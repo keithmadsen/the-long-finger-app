@@ -1,0 +1,10 @@
+/*
+ * Capture field wrapper: the input with the N/200 counter tucked beneath it,
+ * right-aligned. The counter only renders near the cap, so the gap collapses
+ * when it is absent.
+ */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}

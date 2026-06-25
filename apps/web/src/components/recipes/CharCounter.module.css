@@ -1,0 +1,10 @@
+/*
+ * The N/200 counter — micro type scale, muted color (AC 3). --font-size-micro
+ * (12px) is "Reserved" in the token file; this is its first consumer.
+ */
+.counter {
+  align-self: flex-end;
+  font-size: var(--font-size-micro);
+  line-height: var(--line-height-micro);
+  color: var(--color-on-surface-muted);
+}
