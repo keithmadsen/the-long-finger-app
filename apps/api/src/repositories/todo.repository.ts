@@ -1,4 +1,4 @@
-import type { CreateTodoBody, Todo } from '@tlf/contracts';
+import type { CreateTodoBody, PatchTodoBody, Todo } from '@tlf/contracts';
 import type { Dependencies } from '../types/cradle.js';
 
 // The raw on-disk row shape. snake_case and `completed` as 0/1 live ONLY here.
@@ -25,6 +25,9 @@ export function todoRepository({ db }: Dependencies) {
      ON CONFLICT(id) DO NOTHING`,
   );
   const findByIdStatement = db.prepare('SELECT * FROM todos WHERE id = ?');
+  const updateStatement = db.prepare(
+    'UPDATE todos SET completed = @completed, updated_at = @updated_at WHERE id = @id',
+  );
 
   // The SINGLE place casing crosses over and `completed` is coerced to boolean
   // (AC 4). No mapping logic exists anywhere else in the codebase.
@@ -63,5 +66,27 @@ export function todoRepository({ db }: Dependencies) {
     return { todo: toDomain(row), created: result.changes > 0 };
   }
 
-  return { listTodos, insertTodo };
+  // Toggle completion (Story 1.8 AC 7, 9). The server stamps `updated_at` to the
+  // write time — NEVER trusting a client timestamp — so the next fresh GET
+  // re-sorts the toggled item into canonical order (completed ASC, updated_at
+  // DESC). `created_at` is deliberately untouched. `completed` boolean is coerced
+  // to the row's 0/1 here (the toDomain mapper coerces back on read).
+  //
+  // A missing id is NOT a throw: `result.changes === 0` → return null, which the
+  // route maps to the domain 404. This keeps the repository free of transport
+  // concerns (clean-architecture: the 404 envelope is the handler's decision).
+  function updateTodo(id: string, input: PatchTodoBody): Todo | null {
+    const result = updateStatement.run({
+      id,
+      completed: input.completed ? 1 : 0,
+      updated_at: new Date().toISOString(),
+    });
+    if (result.changes === 0) {
+      return null;
+    }
+    const row = findByIdStatement.get(id) as TodoRow;
+    return toDomain(row);
+  }
+
+  return { listTodos, insertTodo, updateTodo };
 }

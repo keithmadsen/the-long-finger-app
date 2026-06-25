@@ -56,6 +56,22 @@
 }
 
 /*
+ * Pending-over-complete precedence (Story 1.8). During the in-flight toggle the
+ * row carries BOTH .pending and .complete (the cache is optimistically flipped),
+ * but `.complete .description` would otherwise win on source order and paint a
+ * PREMATURE strikethrough. This higher-specificity rule (two classes on the same
+ * element) makes the honest-pending treatment win WHILE in flight: the muted
+ * --color-pending text with NO strikethrough. The settled completion treatment
+ * (strikethrough) only appears once .pending clears — at which point the
+ * `.item:not(.pending) .description` transition below fades it in via
+ * --motion-settle. The checkbox already reflects the optimistic destination.
+ */
+.pending.complete .description {
+  color: var(--color-pending);
+  text-decoration: none;
+}
+
+/*
  * Pending must appear as a non-flashing swap once the honest-pending threshold
  * fires, so the pending onset has NO transition. Only the settle back to normal
  * fades via --motion-settle (reduced motion collapses the token to 0).

@@ -1,5 +1,6 @@
 import type { Todo } from '@tlf/contracts'
 import { act, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { TodoItem } from './TodoItem'
@@ -107,6 +108,85 @@ describe('TodoItem', () => {
       expect(row.querySelector('[role="status"]')).toBeNull()
     })
 
+  })
+
+  describe('Toggle wiring (Story 1.8)', () => {
+    it('a single row click fires exactly ONE onToggle (guards the nested-<label> double-fire)', async () => {
+      const user = userEvent.setup()
+      const onToggle = vi.fn()
+      render(<TodoItem onToggle={onToggle} todo={makeTodo({ completed: false })} />)
+
+      // Click the description text — part of the row <label>, which forwards to
+      // the single checkbox it labels. The nested Checkbox label must NOT cause
+      // a second toggle.
+      await user.click(screen.getByText('Buy milk'))
+
+      expect(onToggle).toHaveBeenCalledTimes(1)
+      expect(onToggle).toHaveBeenCalledWith(true)
+    })
+
+    it('clicking the checkbox itself fires exactly ONE onToggle', async () => {
+      const user = userEvent.setup()
+      const onToggle = vi.fn()
+      render(<TodoItem onToggle={onToggle} todo={makeTodo({ completed: false })} />)
+
+      await user.click(screen.getByRole('checkbox', { name: 'Buy milk' }))
+
+      expect(onToggle).toHaveBeenCalledTimes(1)
+      expect(onToggle).toHaveBeenCalledWith(true)
+    })
+
+    it('Space toggles once (native checkbox) (AC 2)', async () => {
+      const user = userEvent.setup()
+      const onToggle = vi.fn()
+      render(<TodoItem onToggle={onToggle} todo={makeTodo({ completed: false })} />)
+
+      screen.getByRole('checkbox', { name: 'Buy milk' }).focus()
+      await user.keyboard(' ')
+
+      expect(onToggle).toHaveBeenCalledTimes(1)
+      expect(onToggle).toHaveBeenCalledWith(true)
+    })
+
+    it('Enter toggles once via the explicit handler (AC 2)', async () => {
+      const user = userEvent.setup()
+      const onToggle = vi.fn()
+      render(<TodoItem onToggle={onToggle} todo={makeTodo({ completed: false })} />)
+
+      screen.getByRole('checkbox', { name: 'Buy milk' }).focus()
+      await user.keyboard('{Enter}')
+
+      expect(onToggle).toHaveBeenCalledTimes(1)
+      // Enter targets the destination state (active → complete).
+      expect(onToggle).toHaveBeenCalledWith(true)
+    })
+
+    it('Enter on a COMPLETE row toggles to active (destination state)', async () => {
+      const user = userEvent.setup()
+      const onToggle = vi.fn()
+      render(<TodoItem onToggle={onToggle} todo={makeTodo({ completed: true })} />)
+
+      screen.getByRole('checkbox', { name: 'Buy milk' }).focus()
+      await user.keyboard('{Enter}')
+
+      expect(onToggle).toHaveBeenCalledWith(false)
+    })
+
+    it('a pending row is aria-disabled and absorbs clicks and keys without calling onToggle (AC 8)', async () => {
+      const user = userEvent.setup()
+      const onToggle = vi.fn()
+      render(<TodoItem pending onToggle={onToggle} todo={makeTodo()} />)
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Buy milk' })
+      expect(checkbox).toHaveAttribute('aria-disabled', 'true')
+
+      await user.click(checkbox)
+      checkbox.focus()
+      await user.keyboard('{Enter}')
+      await user.keyboard(' ')
+
+      expect(onToggle).not.toHaveBeenCalled()
+    })
   })
 
   it('applies the 2-line line-clamp markup to a long description (AC 4)', () => {

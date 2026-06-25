@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildServer } from '../../src/server.js';
 import { buildTestApp, type TestApp } from './helpers/build-test-app.js';
 
@@ -322,6 +322,131 @@ describe('POST /todos concurrent submits (AC 10)', () => {
   });
 });
 
+describe('PATCH /todos/:id toggle path (Story 1.8 AC 1, 7, 9)', () => {
+  let ctx: TestApp;
+
+  beforeEach(async () => {
+    ctx = await buildTestApp();
+  });
+
+  afterEach(async () => {
+    await ctx.cleanup();
+  });
+
+  // Seed one active + one completed row with controlled timestamps so the
+  // canonical-order and updated_at assertions are deterministic.
+  function seed() {
+    const { db } = ctx.app.diContainer.cradle;
+    const insert = db.prepare(
+      `INSERT INTO todos (id, description, completed, created_at, updated_at)
+       VALUES (@id, @description, @completed, @created_at, @updated_at)`,
+    );
+    insert.run({
+      id: 'active-1',
+      description: 'Active one',
+      completed: 0,
+      created_at: '2026-06-25T09:00:00.000Z',
+      updated_at: '2026-06-25T09:00:00.000Z',
+    });
+    insert.run({
+      id: 'active-2',
+      description: 'Active two',
+      completed: 0,
+      created_at: '2026-06-25T08:00:00.000Z',
+      updated_at: '2026-06-25T08:00:00.000Z',
+    });
+  }
+
+  it('200 toggles completed:true, stamps a fresh updated_at, leaves created_at (AC 7, 9)', async () => {
+    seed();
+
+    const res = await ctx.app.inject({
+      method: 'PATCH',
+      url: '/todos/active-1',
+      payload: { completed: true },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body).toEqual({
+      id: 'active-1',
+      description: 'Active one',
+      completed: true,
+      createdAt: '2026-06-25T09:00:00.000Z',
+      updatedAt: expect.any(String),
+    });
+    // The Todo is returned directly — no success envelope (AC 9).
+    expect(body).not.toHaveProperty('data');
+    // Server advanced updated_at past the seeded value; created_at unchanged.
+    expect(body.updatedAt > '2026-06-25T09:00:00.000Z').toBe(true);
+    expect(body.createdAt).toBe('2026-06-25T09:00:00.000Z');
+  });
+
+  it('a completed row re-sorts below actives on the NEXT fresh GET (canonical order, AC 7)', async () => {
+    seed();
+
+    await ctx.app.inject({
+      method: 'PATCH',
+      url: '/todos/active-1',
+      payload: { completed: true },
+    });
+
+    const list = await ctx.app.inject({ method: 'GET', url: '/todos' });
+    const ids = (list.json() as { id: string }[]).map((t) => t.id);
+    // active-2 (still active) sinks above the just-completed active-1.
+    expect(ids).toEqual(['active-2', 'active-1']);
+  });
+
+  it('404 NOT_FOUND envelope when the id does not exist (domain decision, AC 9)', async () => {
+    seed();
+
+    const res = await ctx.app.inject({
+      method: 'PATCH',
+      url: '/todos/missing-id',
+      payload: { completed: true },
+    });
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json()).toEqual({
+      error: { code: 'NOT_FOUND', message: expect.any(String) },
+    });
+  });
+
+  it('400 BAD_REQUEST envelope on an extra/unknown body field (closed object, AC 9)', async () => {
+    seed();
+
+    const res = await ctx.app.inject({
+      method: 'PATCH',
+      url: '/todos/active-1',
+      payload: { completed: true, sneaky: 'extra' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({
+      error: {
+        code: 'BAD_REQUEST',
+        message: expect.any(String),
+        details: expect.anything(),
+      },
+    });
+  });
+
+  it('400 BAD_REQUEST envelope on a malformed body (wrong type) (AC 9)', async () => {
+    seed();
+
+    const res = await ctx.app.inject({
+      method: 'PATCH',
+      url: '/todos/active-1',
+      payload: { completed: 'yes' },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual(
+      expect.objectContaining({ error: expect.objectContaining({ code: 'BAD_REQUEST' }) }),
+    );
+  });
+});
+
 describe('OpenAPI document (AC 10)', () => {
   let ctx: TestApp;
 
@@ -349,6 +474,17 @@ describe('OpenAPI document (AC 10)', () => {
     expect(components.schemas?.Todo).toBeDefined();
     expect(components.schemas?.CreateTodoBody).toBeDefined();
     expect(components.schemas?.ErrorEnvelope).toBeDefined();
+  });
+
+  it('exposes PATCH /todos/{id} referencing PatchTodoBody and registers it as a component (Story 1.8)', () => {
+    const doc = (ctx.app as unknown as { swagger: () => Record<string, unknown> }).swagger();
+    const paths = doc.paths as Record<string, unknown>;
+    const components = doc.components as { schemas?: Record<string, unknown> };
+
+    const patchPath = paths['/todos/{id}'] as Record<string, unknown> | undefined;
+    expect(patchPath?.patch).toBeDefined();
+    expect(JSON.stringify(patchPath)).toContain('PatchTodoBody');
+    expect(components.schemas?.PatchTodoBody).toBeDefined();
   });
 });
 

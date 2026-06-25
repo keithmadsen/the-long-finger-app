@@ -132,4 +132,50 @@ describe('todoRepository', () => {
     expect(count.count).toBe(1);
     db.close();
   });
+
+  it('updateTodo() flips completed, advances updated_at, leaves created_at, returns the mapped Todo (1.8 AC 7)', () => {
+    const { db, repo } = repoWithMemoryDb();
+    seed(db, {
+      id: 'toggle-me',
+      description: 'Toggle me',
+      completed: 0,
+      created_at: '2026-06-25T09:00:00.000Z',
+      updated_at: '2026-06-25T09:00:00.000Z',
+    });
+
+    const updated = repo.updateTodo('toggle-me', { completed: true });
+
+    expect(updated).toEqual({
+      id: 'toggle-me',
+      description: 'Toggle me',
+      completed: true,
+      createdAt: '2026-06-25T09:00:00.000Z',
+      updatedAt: expect.any(String),
+    });
+    // created_at is untouched; updated_at advances past the seeded value.
+    expect(updated!.createdAt).toBe('2026-06-25T09:00:00.000Z');
+    expect(updated!.updatedAt > '2026-06-25T09:00:00.000Z').toBe(true);
+    db.close();
+  });
+
+  it('updateTodo() can uncomplete (true → false) round-trips boolean ↔ 0/1', () => {
+    const { db, repo } = repoWithMemoryDb();
+    seed(db, {
+      id: 'done',
+      description: 'Already done',
+      completed: 1,
+      created_at: '2026-06-25T09:00:00.000Z',
+      updated_at: '2026-06-25T09:30:00.000Z',
+    });
+
+    const reactivated = repo.updateTodo('done', { completed: false });
+    expect(reactivated?.completed).toBe(false);
+    db.close();
+  });
+
+  it('updateTodo() returns null for a missing id (no throw — the route maps it to 404)', () => {
+    const { db, repo } = repoWithMemoryDb();
+    expect(repo.updateTodo('does-not-exist', { completed: true })).toBeNull();
+    db.close();
+  });
 });

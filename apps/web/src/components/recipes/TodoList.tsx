@@ -7,6 +7,10 @@ export interface TodoListProps {
   todos: Todo[]
   /** Ids whose create is in-flight — each maps to a Pending <TodoItem> (1.7). */
   pendingIds?: ReadonlySet<string>
+  /** Ids whose completion toggle is in-flight — also renders Pending (1.8). */
+  togglingIds?: ReadonlySet<string>
+  /** Toggle a row's completion (1.8). Wired by App to useToggleTodo. */
+  onToggle?: (id: string, completed: boolean) => void
 }
 
 /*
@@ -22,13 +26,22 @@ export interface TodoListProps {
  * <ul> already carries the list role; the explicit role="list" guards against
  * the list-role being stripped when list-style is removed in some browsers.
  */
-export function TodoList({ todos, pendingIds }: TodoListProps) {
+export function TodoList({
+  todos,
+  pendingIds,
+  togglingIds,
+  onToggle,
+}: TodoListProps) {
   return (
     <ul className={styles.list} role="list">
       {todos.map((todo) => (
         <TodoItem
           key={todo.id}
-          pending={pendingIds?.has(todo.id) ?? false}
+          onToggle={(completed) => onToggle?.(todo.id, completed)}
+          pending={
+            (pendingIds?.has(todo.id) ?? false) ||
+            (togglingIds?.has(todo.id) ?? false)
+          }
           todo={todo}
         />
       ))}
