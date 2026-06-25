@@ -66,7 +66,7 @@ describe('useToggleTodo', () => {
     vi.unstubAllGlobals()
   })
 
-  it('onMutate flips completed IN PLACE keeping array position and tracks the id (AC 4, 8)', async () => {
+  it('onMutate tracks the pending destination without changing confirmed data (AC 3, 4, 8)', async () => {
     const client = createTestQueryClient()
     client.setQueryData<Todo[]>(['todos'], [
       todo({ id: 'a', description: 'first', completed: false }),
@@ -82,14 +82,16 @@ describe('useToggleTodo', () => {
     act(() => result.current.toggle('a', true))
 
     await waitFor(() => {
-      const list = client.getQueryData<Todo[]>(['todos'])
-      expect(list?.[0]?.completed).toBe(true)
+      expect(result.current.togglingCompletedById.a).toBe(true)
     })
     const list = client.getQueryData<Todo[]>(['todos']) ?? []
     // Position preserved: 'a' is still index 0, 'b' still index 1, length 2.
     expect(list.map((t) => t.id)).toEqual(['a', 'b'])
+    // Confirmed data is unchanged until success, so completion styling/title do
+    // not move early; the checkbox destination is tracked separately.
+    expect(list[0]?.completed).toBe(false)
     expect(list[1]?.completed).toBe(false)
-    expect(result.current.togglingIds.has('a')).toBe(true)
+    expect(result.current.togglingCompletedById.a).toBe(true)
   })
 
   it('announces "{description} marked complete." on success and captures the server updatedAt in place, NOT invalidating (AC 3, 4)', async () => {
@@ -150,11 +152,11 @@ describe('useToggleTodo', () => {
     expect(announce).toHaveBeenCalledWith(
       'Couldn’t update “Buy milk”. The list refreshed to current state.',
     )
-    // Reverted in place to the snapshot's completed:false.
+    // Confirmed data remains/reconciles to the backend-confirmed completed:false.
     expect(client.getQueryData<Todo[]>(['todos'])?.[0]?.completed).toBe(false)
     // Reconciled via invalidate (the AC 5 refetch).
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['todos'] })
-    expect(result.current.togglingIds.size).toBe(0)
+    expect(Object.keys(result.current.togglingCompletedById)).toHaveLength(0)
   })
 
   it('mixed-outcome concurrent toggles on different rows do not cross-contaminate (AC 8)', async () => {
@@ -171,10 +173,12 @@ describe('useToggleTodo', () => {
       result.current.toggle('bad', true)
     })
 
-    await waitFor(() => expect(result.current.togglingIds.size).toBe(0))
+    await waitFor(() =>
+      expect(Object.keys(result.current.togglingCompletedById)).toHaveLength(0),
+    )
     const list = client.getQueryData<Todo[]>(['todos']) ?? []
     const byId = Object.fromEntries(list.map((t) => [t.id, t.completed]))
-    // The success persists; the failure's rollback did not clear the success.
+    // The success persists; the failure did not clear the success.
     expect(byId.good).toBe(true)
     expect(byId.bad).toBe(false)
   })
@@ -190,11 +194,30 @@ describe('useToggleTodo', () => {
 
     const { result } = setup(client)
     act(() => result.current.toggle('a', true))
-    await waitFor(() => expect(result.current.togglingIds.has('a')).toBe(true))
+    await waitFor(() =>
+      expect(result.current.togglingCompletedById.a).toBe(true),
+    )
 
     // A conflicting second toggle of the same row must be a no-op.
     act(() => result.current.toggle('a', false))
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('per-row arbitration blocks same-tick duplicate toggles before React state updates (AC 8)', async () => {
+    const client = createTestQueryClient()
+    client.setQueryData<Todo[]>(['todos'], [
+      todo({ id: 'a', description: 'a task', completed: false }),
+    ])
+    const fetchMock = vi.fn(() => new Promise<Response>(() => {}))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { result } = setup(client)
+    act(() => {
+      result.current.toggle('a', true)
+      result.current.toggle('a', false)
+    })
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
   })
 })

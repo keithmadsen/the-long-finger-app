@@ -13,6 +13,8 @@ export interface TodoItemProps {
    * aria-disabled (AC 8).
    */
   pending?: boolean
+  /** Pending toggle destination. Lets the checkbox move before confirmed styling. */
+  pendingCompleted?: boolean
   /** Toggle this row's completion (Story 1.8). The arg is the destination state. */
   onToggle?: (completed: boolean) => void
 }
@@ -50,8 +52,14 @@ export interface TodoItemProps {
  *
  * The checkbox stays presentational/inert while pending (toggle is Story 1.8).
  */
-export function TodoItem({ todo, pending = false, onToggle }: TodoItemProps) {
+export function TodoItem({
+  todo,
+  pending = false,
+  pendingCompleted,
+  onToggle,
+}: TodoItemProps) {
   const { ariaBusy, showPending } = usePendingPresentation(pending)
+  const checked = pendingCompleted ?? todo.completed
 
   const className = [
     styles.item,
@@ -61,16 +69,15 @@ export function TodoItem({ todo, pending = false, onToggle }: TodoItemProps) {
     .filter(Boolean)
     .join(' ')
 
-  // Enter must toggle too (AC 2). A native checkbox toggles on Space only, so
-  // Enter is wired explicitly: catch it bubbling from the focused input to the
-  // row, fire the same toggle (to the destination state), and preventDefault.
-  // Guarded by !pending so an in-flight row absorbs the key (AC 8). Space is
-  // left to the native checkbox — handling only Enter avoids a double-toggle.
+  // Enter must toggle too (AC 2). The row label is also focusable as the row
+  // anchor this story establishes; Space on that row anchor toggles as well.
+  // Space bubbling from the native checkbox is ignored so it cannot double-fire.
   function handleKeyDown(event: KeyboardEvent<HTMLLabelElement>) {
-    if (event.key !== 'Enter') return
+    const rowHasFocus = event.target === event.currentTarget
+    if (event.key !== 'Enter' && !(event.key === ' ' && rowHasFocus)) return
     event.preventDefault()
     if (pending) return
-    onToggle?.(!todo.completed)
+    onToggle?.(!checked)
   }
 
   return (
@@ -81,14 +88,20 @@ export function TodoItem({ todo, pending = false, onToggle }: TodoItemProps) {
        * interactive control is that checkbox, so this is keyboard parity, not a
        * new interactive surface.
        */}
-      <label className={className} onKeyDown={handleKeyDown}>
+      <label
+        aria-disabled={pending || undefined}
+        className={className}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+      >
         <Checkbox
           aria-disabled={pending || undefined}
           aria-label={todo.description}
-          checked={todo.completed}
+          checked={checked}
           onCheckedChange={(checked) => {
             if (!pending) onToggle?.(checked)
           }}
+          rootAsLabel={false}
         />
         <span className={styles.description}>{todo.description}</span>
       </label>

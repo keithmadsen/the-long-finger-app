@@ -10,6 +10,7 @@ type NativeCheckboxProps = Omit<
 export type CheckboxProps = NativeCheckboxProps & {
   checked: boolean
   onCheckedChange?: (checked: boolean) => void
+  rootAsLabel?: boolean
   ref?: Ref<HTMLInputElement>
 }
 
@@ -17,6 +18,7 @@ export function Checkbox({
   checked,
   className,
   onCheckedChange,
+  rootAsLabel = true,
   ...props
 }: CheckboxProps) {
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
@@ -27,8 +29,10 @@ export function Checkbox({
     onCheckedChange?.(event.target.checked)
   }
 
+  const Root = rootAsLabel ? 'label' : 'span'
+
   return (
-    <label className={[styles.root, className].filter(Boolean).join(' ')}>
+    <Root className={[styles.root, className].filter(Boolean).join(' ')}>
       <input
         {...props}
         checked={checked}
@@ -37,6 +41,6 @@ export function Checkbox({
         type="checkbox"
       />
       <span aria-hidden="true" className={styles.indicator} />
-    </label>
+    </Root>
   )
 }

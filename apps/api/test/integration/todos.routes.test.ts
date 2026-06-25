@@ -345,8 +345,8 @@ describe('PATCH /todos/:id toggle path (Story 1.8 AC 1, 7, 9)', () => {
       id: 'active-1',
       description: 'Active one',
       completed: 0,
-      created_at: '2026-06-25T09:00:00.000Z',
-      updated_at: '2026-06-25T09:00:00.000Z',
+      created_at: '2020-01-01T09:00:00.000Z',
+      updated_at: '2020-01-01T09:00:00.000Z',
     });
     insert.run({
       id: 'active-2',
@@ -372,14 +372,14 @@ describe('PATCH /todos/:id toggle path (Story 1.8 AC 1, 7, 9)', () => {
       id: 'active-1',
       description: 'Active one',
       completed: true,
-      createdAt: '2026-06-25T09:00:00.000Z',
+      createdAt: '2020-01-01T09:00:00.000Z',
       updatedAt: expect.any(String),
     });
     // The Todo is returned directly — no success envelope (AC 9).
     expect(body).not.toHaveProperty('data');
     // Server advanced updated_at past the seeded value; created_at unchanged.
-    expect(body.updatedAt > '2026-06-25T09:00:00.000Z').toBe(true);
-    expect(body.createdAt).toBe('2026-06-25T09:00:00.000Z');
+    expect(body.updatedAt > '2020-01-01T09:00:00.000Z').toBe(true);
+    expect(body.createdAt).toBe('2020-01-01T09:00:00.000Z');
   });
 
   it('a completed row re-sorts below actives on the NEXT fresh GET (canonical order, AC 7)', async () => {

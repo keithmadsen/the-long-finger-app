@@ -150,4 +150,20 @@ describe('patchTodo (Story 1.8)', () => {
       'PATCH /todos returned a malformed response body',
     )
   })
+
+  it('rejects a 2xx Todo body for a different id', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ ...TOGGLED, id: 'different-id' }), {
+            status: 200,
+          }),
+      ),
+    )
+
+    await expect(patchTodo(BODY.id, { completed: true })).rejects.toThrow(
+      'PATCH /todos returned a malformed response body',
+    )
+  })
 })

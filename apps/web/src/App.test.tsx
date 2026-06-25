@@ -304,6 +304,47 @@ describe('App toggle (Story 1.8)', () => {
     )
   })
 
+  it('keeps the active-count title confirmed until PATCH succeeds (AC 6)', async () => {
+    const user = userEvent.setup()
+    let resolvePatch: ((response: Response) => void) | undefined
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (!init || init.method === undefined || init.method === 'GET') {
+        return okResponse([
+          todo({ id: 'a', description: 'active one', completed: false }),
+          todo({ id: 'b', description: 'active two', completed: false }),
+        ])
+      }
+      return new Promise<Response>((resolve) => {
+        resolvePatch = resolve
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderWithClient(<App />)
+
+    const list = await screen.findByRole('list')
+    await waitFor(() => expect(document.title).toBe('the long finger (2 active)'))
+
+    await user.click(within(list).getAllByRole('checkbox')[0]!)
+
+    expect(document.title).toBe('the long finger (2 active)')
+
+    act(() =>
+      resolvePatch?.(
+        okResponse(
+          todo({
+            id: 'a',
+            description: 'active one',
+            completed: true,
+            updatedAt: '2026-06-25T15:00:00.000Z',
+          }),
+        ),
+      ),
+    )
+
+    await waitFor(() => expect(document.title).toBe('the long finger (1 active)'))
+  })
+
   it('a failed toggle announces the failure once and the row reconciles to backend state (AC 5)', async () => {
     const user = userEvent.setup()
     // GET returns the active row; PATCH always 500s. The reconcile refetch keeps

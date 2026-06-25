@@ -136,12 +136,12 @@ describe('TodoItem', () => {
       expect(onToggle).toHaveBeenCalledWith(true)
     })
 
-    it('Space toggles once (native checkbox) (AC 2)', async () => {
+    it('Space toggles once from the row focus anchor (AC 2)', async () => {
       const user = userEvent.setup()
       const onToggle = vi.fn()
       render(<TodoItem onToggle={onToggle} todo={makeTodo({ completed: false })} />)
 
-      screen.getByRole('checkbox', { name: 'Buy milk' }).focus()
+      screen.getByText('Buy milk').closest('label')?.focus()
       await user.keyboard(' ')
 
       expect(onToggle).toHaveBeenCalledTimes(1)
@@ -153,7 +153,7 @@ describe('TodoItem', () => {
       const onToggle = vi.fn()
       render(<TodoItem onToggle={onToggle} todo={makeTodo({ completed: false })} />)
 
-      screen.getByRole('checkbox', { name: 'Buy milk' }).focus()
+      screen.getByText('Buy milk').closest('label')?.focus()
       await user.keyboard('{Enter}')
 
       expect(onToggle).toHaveBeenCalledTimes(1)
@@ -166,7 +166,7 @@ describe('TodoItem', () => {
       const onToggle = vi.fn()
       render(<TodoItem onToggle={onToggle} todo={makeTodo({ completed: true })} />)
 
-      screen.getByRole('checkbox', { name: 'Buy milk' }).focus()
+      screen.getByText('Buy milk').closest('label')?.focus()
       await user.keyboard('{Enter}')
 
       expect(onToggle).toHaveBeenCalledWith(false)
@@ -178,14 +178,39 @@ describe('TodoItem', () => {
       render(<TodoItem pending onToggle={onToggle} todo={makeTodo()} />)
 
       const checkbox = screen.getByRole('checkbox', { name: 'Buy milk' })
+      const row = screen.getByText('Buy milk').closest('label')
+      expect(row).toHaveAttribute('aria-disabled', 'true')
       expect(checkbox).toHaveAttribute('aria-disabled', 'true')
 
       await user.click(checkbox)
-      checkbox.focus()
+      row?.focus()
       await user.keyboard('{Enter}')
       await user.keyboard(' ')
 
       expect(onToggle).not.toHaveBeenCalled()
+    })
+
+    it('pending destination checks the box without applying settled completion styling early', () => {
+      render(
+        <TodoItem
+          pending
+          pendingCompleted
+          todo={makeTodo({ completed: false })}
+        />,
+      )
+
+      expect(screen.getByRole('checkbox', { name: 'Buy milk' })).toBeChecked()
+      expect(classNameOf(screen.getByText('Buy milk').closest('label'))).not.toMatch(
+        /complete/,
+      )
+    })
+
+    it('uses the row as the single label source when toggle wiring is active', () => {
+      render(<TodoItem onToggle={vi.fn()} todo={makeTodo()} />)
+
+      const row = screen.getByText('Buy milk').closest('label')
+      expect(row).toBeInTheDocument()
+      expect(row?.querySelector('label')).toBeNull()
     })
   })
 

@@ -94,7 +94,7 @@ export async function patchTodo(
 
   try {
     const parsed: unknown = await response.json()
-    if (!isTodo(parsed)) {
+    if (!isTodo(parsed) || parsed.id !== id) {
       throw new Error('PATCH /todos returned a malformed response body')
     }
     return parsed

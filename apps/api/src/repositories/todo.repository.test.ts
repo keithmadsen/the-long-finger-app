@@ -139,8 +139,8 @@ describe('todoRepository', () => {
       id: 'toggle-me',
       description: 'Toggle me',
       completed: 0,
-      created_at: '2026-06-25T09:00:00.000Z',
-      updated_at: '2026-06-25T09:00:00.000Z',
+      created_at: '2020-01-01T09:00:00.000Z',
+      updated_at: '2020-01-01T09:00:00.000Z',
     });
 
     const updated = repo.updateTodo('toggle-me', { completed: true });
@@ -149,12 +149,12 @@ describe('todoRepository', () => {
       id: 'toggle-me',
       description: 'Toggle me',
       completed: true,
-      createdAt: '2026-06-25T09:00:00.000Z',
+      createdAt: '2020-01-01T09:00:00.000Z',
       updatedAt: expect.any(String),
     });
     // created_at is untouched; updated_at advances past the seeded value.
-    expect(updated!.createdAt).toBe('2026-06-25T09:00:00.000Z');
-    expect(updated!.updatedAt > '2026-06-25T09:00:00.000Z').toBe(true);
+    expect(updated!.createdAt).toBe('2020-01-01T09:00:00.000Z');
+    expect(updated!.updatedAt > '2020-01-01T09:00:00.000Z').toBe(true);
     db.close();
   });
 

@@ -4,7 +4,7 @@ baseline_commit: 3a97b13625c1557aeb3425fbdd1d9959512300c7
 
 # Story 1.8: Complete & Uncomplete a Task
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -75,6 +75,18 @@ so that I can mark progress as quickly and naturally as crossing a line off pape
   - [x] Keep `App.axe.test.tsx` / `App.firstInteractive.test.tsx` green (no a11y regression; capture input stays first interactive).
 - [x] **Gates** (all ACs)
   - [x] Run `npm run typecheck`, `npm test` (workspaces), `npm run test:unit`/`test:integration`, `npm run lint --workspace apps/web`, `npm run lint:css --workspace apps/web`, `npm run contrast:check --workspace apps/web`, and `npm run size:check --workspace apps/web` (rebaseline with `-- --update` only if the small `useToggleTodo`/`patchTodo` additions intentionally exceed the tolerance; no new deps expected).
+
+### Review Findings
+
+- [x] [Review][Patch] Completion styling appears before the toggle confirms [apps/web/src/components/recipes/TodoItem.tsx:56]
+- [x] [Review][Patch] Per-row arbitration can race before `togglingIds` state updates [apps/web/src/hooks/useToggleTodo.ts:134]
+- [x] [Review][Patch] `patchTodo` accepts a valid Todo response for the wrong id [apps/web/src/api/todos.ts:95]
+- [x] [Review][Patch] Row pending state exposes `aria-disabled` only on the checkbox, not the row [apps/web/src/components/recipes/TodoItem.tsx:84]
+- [x] [Review][Patch] Row keyboard focus contract is not established [apps/web/src/components/recipes/TodoItem.tsx:84]
+- [x] [Review][Patch] Nested label structure remains active now that toggles are wired [apps/web/src/components/recipes/TodoItem.tsx:84]
+- [x] [Review][Patch] Active-count title updates optimistically before PATCH confirmation [apps/web/src/hooks/useToggleTodo.ts:79]
+- [x] [Review][Patch] Failure announcement can claim refresh before reconciliation finishes [apps/web/src/hooks/useToggleTodo.ts:118]
+- [x] [Review][Patch] Toggle timestamp tests compare against a same-day wall-clock seed [apps/api/src/repositories/todo.repository.test.ts:157]
 
 ## Dev Notes
 

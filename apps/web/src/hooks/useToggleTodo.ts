@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Todo } from '@tlf/contracts'
 
@@ -39,51 +39,40 @@ interface ToggleVariables {
   description: string
 }
 
-interface MutationContext {
-  previous: Todo[] | undefined
-}
-
 export function useToggleTodo({ announce }: UseToggleTodoOptions = {}) {
   const queryClient = useQueryClient()
-  // The set of in-flight (toggling) ids. Client-only presentation state — never a
-  // field on the Todo contract. <TodoItem> reads membership to render Pending and
-  // to go inert (aria-disabled) while the toggle is in flight (AC 8).
-  const [togglingIds, setTogglingIds] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  )
+  const inFlightIdsRef = useRef<Set<string>>(new Set())
+  // Client-only presentation state: keys are in-flight row ids, values are the
+  // pending checkbox destinations. Never a field on the Todo contract.
+  const [togglingCompletedById, setTogglingCompletedById] = useState<
+    Readonly<Record<string, boolean>>
+  >({})
 
-  function addToggling(id: string) {
-    setTogglingIds((prev) => new Set(prev).add(id))
+  function setTogglingDestination(id: string, completed: boolean) {
+    setTogglingCompletedById((prev) => ({ ...prev, [id]: completed }))
   }
 
   function removeToggling(id: string) {
-    setTogglingIds((prev) => {
-      if (!prev.has(id)) return prev
-      const next = new Set(prev)
-      next.delete(id)
+    inFlightIdsRef.current.delete(id)
+    setTogglingCompletedById((prev) => {
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
       return next
     })
   }
 
-  const mutation = useMutation<Todo, Error, ToggleVariables, MutationContext>({
+  const mutation = useMutation<Todo, Error, ToggleVariables>({
     mutationFn: ({ id, completed }) => patchTodo(id, { completed }),
 
     onMutate: async ({ id, completed }) => {
       // Stop any in-flight list refetch from clobbering our optimistic write.
       await queryClient.cancelQueries({ queryKey: ['todos'] })
-      const previous = queryClient.getQueryData<Todo[]>(['todos'])
 
-      // Optimistic write IN PLACE: flip this row's completed, keep its array
-      // position (map by id — never prepend or re-sort). The checkbox reflects
-      // the destination immediately; canonical re-sort waits for the next load.
-      queryClient.setQueryData<Todo[]>(['todos'], (old) =>
-        (old ?? []).map((todo) =>
-          todo.id === id ? { ...todo, completed } : todo,
-        ),
-      )
-      addToggling(id)
-
-      return { previous }
+      // Keep the canonical Todo data backend-confirmed until success. The checkbox
+      // reflects the pending destination from client-only state, but .complete
+      // styling and App's active-count title keep reading confirmed data.
+      setTogglingDestination(id, completed)
     },
 
     onSuccess: (confirmedTodo, { id, completed, description }) => {
@@ -102,22 +91,11 @@ export function useToggleTodo({ announce }: UseToggleTodoOptions = {}) {
       )
     },
 
-    onError: (_error, { id, description }, context) => {
-      // Revert THIS row's completed in place from the snapshot — a per-id restore,
-      // never a whole-snapshot restore, so concurrent in-flight rows survive.
-      const previousRow = context?.previous?.find((todo) => todo.id === id)
-      if (previousRow) {
-        queryClient.setQueryData<Todo[]>(['todos'], (old) =>
-          (old ?? []).map((todo) =>
-            todo.id === id
-              ? { ...todo, completed: previousRow.completed }
-              : todo,
-          ),
-        )
-      }
+    onError: async (_error, { description }) => {
       // Reconcile to backend truth (AC 5): the change must not silently persist.
-      void queryClient.invalidateQueries({ queryKey: ['todos'] })
-      // Curly apostrophe + curly quotes to match the existing failure copy.
+      await queryClient.invalidateQueries({ queryKey: ['todos'] })
+      // Curly apostrophe + curly quotes to match the existing failure copy. Announce
+      // only after the reconciliation request has completed.
       announce?.(
         `Couldn’t update “${description}”. The list refreshed to current state.`,
       )
@@ -132,11 +110,12 @@ export function useToggleTodo({ announce }: UseToggleTodoOptions = {}) {
   // already has a toggle in flight, do NOT fire a conflicting second mutation.
   // The description is read from the current cache row so the announcement has it.
   function toggle(id: string, completed: boolean) {
-    if (togglingIds.has(id)) return
+    if (inFlightIdsRef.current.has(id)) return
+    inFlightIdsRef.current.add(id)
     const current = queryClient.getQueryData<Todo[]>(['todos'])
     const description = current?.find((todo) => todo.id === id)?.description ?? ''
     mutation.mutate({ id, completed, description })
   }
 
-  return { toggle, togglingIds }
+  return { toggle, togglingCompletedById }
 }

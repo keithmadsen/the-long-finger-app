@@ -7,8 +7,8 @@ export interface TodoListProps {
   todos: Todo[]
   /** Ids whose create is in-flight — each maps to a Pending <TodoItem> (1.7). */
   pendingIds?: ReadonlySet<string>
-  /** Ids whose completion toggle is in-flight — also renders Pending (1.8). */
-  togglingIds?: ReadonlySet<string>
+  /** Pending toggle destination by id, used for checkbox-only optimistic feedback. */
+  togglingCompletedById?: Readonly<Record<string, boolean>>
   /** Toggle a row's completion (1.8). Wired by App to useToggleTodo. */
   onToggle?: (id: string, completed: boolean) => void
 }
@@ -29,7 +29,7 @@ export interface TodoListProps {
 export function TodoList({
   todos,
   pendingIds,
-  togglingIds,
+  togglingCompletedById,
   onToggle,
 }: TodoListProps) {
   return (
@@ -38,9 +38,10 @@ export function TodoList({
         <TodoItem
           key={todo.id}
           onToggle={(completed) => onToggle?.(todo.id, completed)}
+          pendingCompleted={togglingCompletedById?.[todo.id]}
           pending={
             (pendingIds?.has(todo.id) ?? false) ||
-            (togglingIds?.has(todo.id) ?? false)
+            togglingCompletedById?.[todo.id] !== undefined
           }
           todo={todo}
         />

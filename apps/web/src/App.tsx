@@ -60,7 +60,7 @@ function App() {
 
   // The toggle mutation is owned HERE (like create) so its in-flight ids reach
   // the list and drive each row's honest-pending presentation (1.7 precedent).
-  const { toggle, togglingIds } = useToggleTodo({ announce })
+  const { toggle, togglingCompletedById } = useToggleTodo({ announce })
 
   // Reactive <title> (AC 7): "the long finger (N active)", count omitted at zero.
   useEffect(() => {
@@ -153,7 +153,7 @@ function App() {
         onToggle={toggle}
         pendingIds={pendingIds}
         todos={data}
-        togglingIds={togglingIds}
+        togglingCompletedById={togglingCompletedById}
       />
     )
   }
