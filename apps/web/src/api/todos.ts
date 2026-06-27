@@ -1,4 +1,4 @@
-import type { CreateTodoBody, Todo } from '@tlf/contracts'
+import type { CreateTodoBody, PatchTodoBody, Todo } from '@tlf/contracts'
 
 /*
  * The ONLY place the network is touched for the read path (architecture.md
@@ -66,5 +66,39 @@ export async function createTodo(body: CreateTodoBody): Promise<Todo> {
     return parsed
   } catch {
     throw new Error('POST /todos returned a malformed response body')
+  }
+}
+
+/*
+ * Toggle a todo's completion (Story 1.8). PATCHes `{ completed }` ONLY — the
+ * server owns updated_at and never trusts a client timestamp. Mirrors createTodo:
+ * throws on a non-OK response (a 404/400/500 routes to useToggleTodo's onError,
+ * which reverts the row in place and reconciles) AND on a malformed 2xx body
+ * (reusing the isTodo guard), so a bad payload never crashes the render. The
+ * returned Todo carries the server's real updated_at — useToggleTodo writes it
+ * into the same array position to capture it without re-sorting.
+ */
+export async function patchTodo(
+  id: string,
+  body: PatchTodoBody,
+): Promise<Todo> {
+  const response = await fetch(`/todos/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ completed: body.completed }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`PATCH /todos/${id} failed: ${response.status}`)
+  }
+
+  try {
+    const parsed: unknown = await response.json()
+    if (!isTodo(parsed) || parsed.id !== id) {
+      throw new Error('PATCH /todos returned a malformed response body')
+    }
+    return parsed
+  } catch {
+    throw new Error('PATCH /todos returned a malformed response body')
   }
 }

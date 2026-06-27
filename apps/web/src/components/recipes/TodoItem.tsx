@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react'
 import type { Todo } from '@tlf/contracts'
 
 import { Checkbox } from '../primitives'
@@ -6,8 +7,16 @@ import styles from './TodoItem.module.css'
 
 export interface TodoItemProps {
   todo: Todo
-  /** True while this row's create is in-flight (honest-pending; Story 1.7). */
+  /**
+   * True while this row's create OR toggle is in-flight (honest-pending; Story
+   * 1.7/1.8). While pending the row is inert: taps/keys are absorbed and it is
+   * aria-disabled (AC 8).
+   */
   pending?: boolean
+  /** Pending toggle destination. Lets the checkbox move before confirmed styling. */
+  pendingCompleted?: boolean
+  /** Toggle this row's completion (Story 1.8). The arg is the destination state. */
+  onToggle?: (completed: boolean) => void
 }
 
 /*
@@ -19,10 +28,13 @@ export interface TodoItemProps {
  * later stories build on — Story 1.8 only adds onCheckedChange behavior; Epic 2
  * only ADDS a sibling delete <button> with stopPropagation. Do not rewrite it.
  *
- * The checkbox is PRESENTATIONAL in 1.6: it reflects todo.completed but has no
- * onCheckedChange, so clicking is inert (the primitive still attaches a native
- * onChange, so React keeps it controlled with no missing-handler warning, and
- * no app state changes). Story 1.8 wires onCheckedChange → useToggleTodo.
+ * Story 1.8 wires the checkbox's onCheckedChange → onToggle (App's
+ * useToggleTodo). A tap anywhere on the row (the wrapping <label>) toggles via
+ * the single checkbox it labels. Keyboard: Space toggles natively; Enter does
+ * NOT on a checkbox, so it is wired explicitly (onKeyDown, preventDefault).
+ * Both paths are guarded by `!pending` so an in-flight row absorbs repeat
+ * taps/keys (AC 8); the checkbox carries aria-disabled while pending so focus
+ * visibility is preserved (gotcha: aria-disabled, never HTML disabled).
  *
  * Display variants:
  *   Active   → full-contrast text, unchecked box.
@@ -40,8 +52,14 @@ export interface TodoItemProps {
  *
  * The checkbox stays presentational/inert while pending (toggle is Story 1.8).
  */
-export function TodoItem({ todo, pending = false }: TodoItemProps) {
+export function TodoItem({
+  todo,
+  pending = false,
+  pendingCompleted,
+  onToggle,
+}: TodoItemProps) {
   const { ariaBusy, showPending } = usePendingPresentation(pending)
+  const checked = pendingCompleted ?? todo.completed
 
   const className = [
     styles.item,
@@ -51,10 +69,40 @@ export function TodoItem({ todo, pending = false }: TodoItemProps) {
     .filter(Boolean)
     .join(' ')
 
+  // Enter must toggle too (AC 2). The row label is also focusable as the row
+  // anchor this story establishes; Space on that row anchor toggles as well.
+  // Space bubbling from the native checkbox is ignored so it cannot double-fire.
+  function handleKeyDown(event: KeyboardEvent<HTMLLabelElement>) {
+    const rowHasFocus = event.target === event.currentTarget
+    if (event.key !== 'Enter' && !(event.key === ' ' && rowHasFocus)) return
+    event.preventDefault()
+    if (pending) return
+    onToggle?.(!checked)
+  }
+
   return (
     <li aria-busy={ariaBusy || undefined} role="listitem">
-      <label className={className}>
-        <Checkbox aria-label={todo.description} checked={todo.completed} />
+      {/*
+       * onKeyDown on the row catches Enter bubbling from the focused checkbox and
+       * re-routes it to a toggle (Space stays native). The label's only
+       * interactive control is that checkbox, so this is keyboard parity, not a
+       * new interactive surface.
+       */}
+      <label
+        aria-disabled={pending || undefined}
+        className={className}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+      >
+        <Checkbox
+          aria-disabled={pending || undefined}
+          aria-label={todo.description}
+          checked={checked}
+          onCheckedChange={(checked) => {
+            if (!pending) onToggle?.(checked)
+          }}
+          rootAsLabel={false}
+        />
         <span className={styles.description}>{todo.description}</span>
       </label>
     </li>

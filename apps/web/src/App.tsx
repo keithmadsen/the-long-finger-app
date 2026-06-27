@@ -6,6 +6,7 @@ import { CaptureInput } from './components/recipes/CaptureInput'
 import { EmptyState } from './components/recipes/EmptyState'
 import { TodoList } from './components/recipes/TodoList'
 import { useCreateTodo } from './hooks/useCreateTodo'
+import { useToggleTodo } from './hooks/useToggleTodo'
 import { useTodos } from './hooks/useTodos'
 import styles from './App.module.css'
 
@@ -29,9 +30,8 @@ const INSTRUCTION_LINE = 'Type a task and press Enter to add it to your list.'
  *      the list), and the instruction-line lifecycle.
  * Then it branches the query state into the four layout-stable surfaces (FR-8).
  *
- * Explicitly NOT here (later stories): toggle wiring (1.8), Failed-create
- * recovery / beforeunload (1.9), the unread-error indicator (1.10), delete
- * (Epic 2). Do not stub them.
+ * Explicitly NOT here (later stories): Failed-create recovery / beforeunload
+ * (1.9), the unread-error indicator (1.10), delete (Epic 2). Do not stub them.
  */
 function App() {
   const { data, isPending, isError, refetch } = useTodos()
@@ -57,6 +57,10 @@ function App() {
     announce,
     onCreated: () => setHasEverHadTodos(true),
   })
+
+  // The toggle mutation is owned HERE (like create) so its in-flight ids reach
+  // the list and drive each row's honest-pending presentation (1.7 precedent).
+  const { toggle, togglingCompletedById } = useToggleTodo({ announce })
 
   // Reactive <title> (AC 7): "the long finger (N active)", count omitted at zero.
   useEffect(() => {
@@ -144,7 +148,14 @@ function App() {
     if (!data || data.length === 0) {
       return <EmptyState variant="empty" />
     }
-    return <TodoList pendingIds={pendingIds} todos={data} />
+    return (
+      <TodoList
+        onToggle={toggle}
+        pendingIds={pendingIds}
+        todos={data}
+        togglingCompletedById={togglingCompletedById}
+      />
+    )
   }
 }
 

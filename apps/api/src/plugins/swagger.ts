@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
-import { todoSchema, createTodoBody, errorEnvelope } from '@tlf/contracts';
+import { todoSchema, createTodoBody, patchTodoBody, errorEnvelope } from '@tlf/contracts';
 
 // Registers the OpenAPI document generation (AR-4's third leg) from the
 // registered TypeBox schemas, plus the Swagger UI at /docs.
@@ -14,6 +14,7 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
   // Register the shared contract schemas as reusable OpenAPI components.
   app.addSchema(todoSchema);
   app.addSchema(createTodoBody);
+  app.addSchema(patchTodoBody);
   app.addSchema(errorEnvelope);
 
   await app.register(fastifySwagger, {

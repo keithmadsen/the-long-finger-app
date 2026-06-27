@@ -44,10 +44,19 @@ export const createTodoBody = Type.Object(
   { $id: 'CreateTodoBody' },
 );
 
-// PATCH body: completion is the sole mutable field (NG-7).
-export const patchTodoBody = Type.Object({
-  completed: Type.Boolean(),
-});
+// PATCH body: completion is the sole mutable field (NG-7). `$id` lets
+// @fastify/swagger register it as a reusable OpenAPI component the route
+// references by $ref (matching the `Todo`/`CreateTodoBody`/`ErrorEnvelope`
+// pattern). `additionalProperties: false` CLOSES the object so an extra/unknown
+// field is a 400 at the boundary (Story 1.8 AC 9) — TypeBox does not close an
+// object by default, and Fastify's `removeAdditional` only strips when the
+// schema is explicitly closed, so this keyword is what makes the contract strict.
+export const patchTodoBody = Type.Object(
+  {
+    completed: Type.Boolean(),
+  },
+  { $id: 'PatchTodoBody', additionalProperties: false },
+);
 
 export type Todo = Static<typeof todoSchema>;
 export type CreateTodoBody = Static<typeof createTodoBody>;

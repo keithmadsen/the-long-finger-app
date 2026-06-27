@@ -21,7 +21,14 @@ export async function buildServer({
   // Pino is on by default: Fastify logs a per-request id (`reqId`) and the
   // per-request latency (`responseTime`) on the response log line. Request
   // bodies are never logged. (AR-9 — logging only, not a CI gate.)
-  const app = Fastify({ logger });
+  // removeAdditional:false makes a CLOSED body schema (additionalProperties:
+  // false, e.g. PatchTodoBody) REJECT an unknown field with a 400 rather than
+  // silently stripping it (Fastify's default removeAdditional:true would strip)
+  // — this is what satisfies the "extra-field body → 400" half of Story 1.8
+  // AC 9. Open schemas (CreateTodoBody) are unaffected: with nothing to close
+  // against, extra fields still pass and are ignored downstream. Every other
+  // Ajv default (coerceTypes, useDefaults, …) is preserved via the merge.
+  const app = Fastify({ logger, ajv: { customOptions: { removeAdditional: false } } });
 
   await registerContainer(app, { databasePath });
 

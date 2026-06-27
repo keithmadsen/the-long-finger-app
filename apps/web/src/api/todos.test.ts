@@ -1,7 +1,7 @@
 import type { CreateTodoBody, Todo } from '@tlf/contracts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { createTodo } from './todos'
+import { createTodo, patchTodo } from './todos'
 
 const BODY: CreateTodoBody = {
   id: '0190ff8c-3e5a-7c1d-8b2e-1a2b3c4d5e6f',
@@ -83,6 +83,87 @@ describe('createTodo', () => {
 
     await expect(createTodo(BODY)).rejects.toThrow(
       'POST /todos returned a malformed response body',
+    )
+  })
+})
+
+describe('patchTodo (Story 1.8)', () => {
+  const TOGGLED: Todo = { ...CREATED, completed: true }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('PATCHes { completed } as JSON to /todos/:id and returns the parsed Todo', async () => {
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify(TOGGLED), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await patchTodo(BODY.id, { completed: true })
+
+    expect(result).toEqual(TOGGLED)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ]
+    expect(url).toBe(`/todos/${BODY.id}`)
+    expect(init.method).toBe('PATCH')
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe(
+      'application/json',
+    )
+    // Exactly { completed } — nothing else is sent.
+    expect(JSON.parse(init.body as string)).toEqual({ completed: true })
+  })
+
+  it('throws on a non-OK response so the mutation onError fires (e.g. 404)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('', { status: 404 })),
+    )
+
+    await expect(patchTodo(BODY.id, { completed: true })).rejects.toThrow(/404/)
+  })
+
+  it('rejects (does not crash) on a malformed 2xx body — routes to onError', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('not json at all', { status: 200 })),
+    )
+
+    await expect(patchTodo(BODY.id, { completed: true })).rejects.toThrow(
+      'PATCH /todos returned a malformed response body',
+    )
+  })
+
+  it('rejects a 2xx body that is JSON but not a Todo shape', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ id: BODY.id }), { status: 200 }),
+      ),
+    )
+
+    await expect(patchTodo(BODY.id, { completed: true })).rejects.toThrow(
+      'PATCH /todos returned a malformed response body',
+    )
+  })
+
+  it('rejects a 2xx Todo body for a different id', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ ...TOGGLED, id: 'different-id' }), {
+            status: 200,
+          }),
+      ),
+    )
+
+    await expect(patchTodo(BODY.id, { completed: true })).rejects.toThrow(
+      'PATCH /todos returned a malformed response body',
     )
   })
 })

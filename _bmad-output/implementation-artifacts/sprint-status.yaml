@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-16
-last_updated: 2026-06-24
+last_updated: 2026-06-25
 project: the long finger
 # 2026-06-16: epic-1 → in-progress, 1-1 → ready-for-dev (create-story)
 # 2026-06-16: 1-1 → in-progress (dev-story)
@@ -69,6 +69,10 @@ project: the long finger
 # 2026-06-22: 1-7 → in-progress (dev-story)
 # 2026-06-23: 1-7 → review (dev-story complete)
 # 2026-06-24: 1-7 → done (code-review fixes applied)
+# 2026-06-25: 1-8 → ready-for-dev (create-story)
+# 2026-06-25: 1-8 → in-progress (dev-story)
+# 2026-06-25: 1-8 → review (dev-story complete)
+# 2026-06-25: 1-8 → done (code-review fixes applied)
 project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"
@@ -83,7 +87,7 @@ development_status:
   1-5-checkbox-liveregion-primitives: done
   1-6-list-view-see-your-tasks: done
   1-7-capture-and-confirm-add-a-task: done
-  1-8-complete-uncomplete-a-task: backlog
+  1-8-complete-uncomplete-a-task: done
   1-9-failed-create-recovery: backlog
   1-10-unread-error-indicator: backlog
   1-11-thin-container-deploy: backlog
