@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { LiveRegion } from './components/primitives'
 import type { LiveRegionHandle } from './components/primitives'
@@ -18,6 +18,13 @@ const LOAD_FAILURE_MESSAGE = 'Couldn’t load your list. Refresh to try again.'
 // Shown above the input ONLY before the user's first task (Story 1.7 AC 1).
 const INSTRUCTION_LINE = 'Type a task and press Enter to add it to your list.'
 
+// Stable id every failed row references via aria-describedby (Story 1.9 AC 5).
+const FAILED_CREATE_HELP_ID = 'failed-create-help'
+// The hidden help text a failed row points at — reassures the user their typed
+// text is held until they act (AC 5). Kept as a constant so the test can assert it.
+const FAILED_CREATE_HELP_TEXT =
+  'Your typed text is saved here until you retry, dismiss, or refresh.'
+
 /*
  * The single screen. Owns the app-level concerns (architecture component
  * boundary):
@@ -30,8 +37,11 @@ const INSTRUCTION_LINE = 'Type a task and press Enter to add it to your list.'
  *      the list), and the instruction-line lifecycle.
  * Then it branches the query state into the four layout-stable surfaces (FR-8).
  *
- * Explicitly NOT here (later stories): Failed-create recovery / beforeunload
- * (1.9), the unread-error indicator (1.10), delete (Epic 2). Do not stub them.
+ * Story 1.9 adds failed-create recovery here: the merged render list
+ * ([...failedCreates, ...data]), the shared hidden aria-describedby help text,
+ * and the beforeunload guard that is active while any create is in the Failed
+ * state. Explicitly NOT here (later stories): the unread-error indicator (1.10),
+ * delete (Epic 2). Do not stub them.
  */
 function App() {
   const { data, isPending, isError, refetch } = useTodos()
@@ -53,7 +63,14 @@ function App() {
   // the server.
   const [hasEverHadTodos, setHasEverHadTodos] = useState(false)
 
-  const { submit, pendingIds } = useCreateTodo({
+  const {
+    submit,
+    pendingIds,
+    failedCreates,
+    retry,
+    dismiss,
+    clearFailedCreates,
+  } = useCreateTodo({
     announce,
     onCreated: () => setHasEverHadTodos(true),
   })
@@ -83,6 +100,21 @@ function App() {
     }
   }, [isError])
 
+  // While any create is in the Failed state, guard an accidental tab close/refresh
+  // (AC 5) — the typed text is held in client state only (no persistence; UX line
+  // 734). Attach on the first failed row, detach when the last one clears (AC 7).
+  // Only attach/detach is assertable; the native dialog itself is not scriptable.
+  useEffect(() => {
+    if (failedCreates.length === 0) return
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault()
+      // Legacy assignment required alongside preventDefault for cross-browser prompting.
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [failedCreates.length])
+
   const currentTodosCount = data?.length ?? 0
   const shouldShowInstruction = !hasEverHadTodos && currentTodosCount === 0
 
@@ -101,6 +133,31 @@ function App() {
   ]
     .filter(Boolean)
     .join(' ')
+
+  const serverIds = useMemo(
+    () => new Set(data?.map((todo) => todo.id) ?? []),
+    [data],
+  )
+  const visibleFailedCreates = failedCreates.filter(
+    (todo) => !serverIds.has(todo.id),
+  )
+
+  useEffect(() => {
+    const reconciledFailedIds = failedCreates
+      .filter((todo) => serverIds.has(todo.id))
+      .map((todo) => todo.id)
+    if (reconciledFailedIds.length > 0) {
+      clearFailedCreates(reconciledFailedIds)
+    }
+  }, [clearFailedCreates, failedCreates, serverIds])
+
+  // Failed creates are pinned ABOVE the server list (where new creates prepend).
+  // They live in the hook's client state, NOT the ['todos'] cache, so a sibling
+  // success's invalidation refetch can never wipe them (AC 8). If a later refetch
+  // proves the server already committed that id, hide and clear the failed copy so
+  // one task never renders twice.
+  const failedIds = new Set(visibleFailedCreates.map((todo) => todo.id))
+  const rows = [...visibleFailedCreates, ...(data ?? [])]
 
   return (
     <main className={styles.app}>
@@ -133,6 +190,18 @@ function App() {
           </>
         )}
 
+        {/*
+         * Shared hidden help text every failed row references via
+         * aria-describedby (AC 5). Rendered ONLY while a failed row exists, using
+         * the accessible-clip idiom (NOT display:none/aria-hidden, which would
+         * hide it from aria-describedby).
+         */}
+        {visibleFailedCreates.length > 0 && (
+          <p className={styles['visually-hidden']} id={FAILED_CREATE_HELP_ID}>
+            {FAILED_CREATE_HELP_TEXT}
+          </p>
+        )}
+
         {renderSurface()}
       </div>
     </main>
@@ -145,14 +214,20 @@ function App() {
     if (isError) {
       return <EmptyState variant="failed" onRetry={() => void refetch()} />
     }
-    if (!data || data.length === 0) {
+    // Decide on the MERGED list so a lone failed create (empty server list) still
+    // renders a row instead of the empty-state (AC 1 / gotcha 5).
+    if (rows.length === 0) {
       return <EmptyState variant="empty" />
     }
     return (
       <TodoList
+        describedById={FAILED_CREATE_HELP_ID}
+        failedIds={failedIds}
+        onDismiss={dismiss}
+        onRetry={retry}
         onToggle={toggle}
         pendingIds={pendingIds}
-        todos={data}
+        todos={rows}
         togglingCompletedById={togglingCompletedById}
       />
     )

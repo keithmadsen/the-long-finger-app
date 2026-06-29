@@ -37,7 +37,7 @@ export interface PendingClock {
   clearTimeout: (handle: unknown) => void
 }
 
-const realClock: PendingClock = {
+export const realClock: PendingClock = {
   now: () => Date.now(),
   setTimeout: (handler, ms) => globalThis.setTimeout(handler, ms),
   clearTimeout: (handle) =>

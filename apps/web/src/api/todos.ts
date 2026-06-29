@@ -46,12 +46,24 @@ function isTodo(value: unknown): value is Todo {
  * Throws on a non-OK response AND on a malformed success body, so either failure
  * routes to the mutation's onError (which rolls the pending row back) rather than
  * crashing the render — mirrors the read-path malformed-payload guard.
+ *
+ * Accepts an optional AbortSignal (Story 1.9): a failed-create's Dismiss aborts
+ * the in-flight POST via its per-row controller. The `await fetch(...)` is left
+ * OUTSIDE any try/catch ON PURPOSE — an aborted fetch throws a DOMException named
+ * 'AbortError' from fetch itself (before the response.ok check), and that error
+ * must propagate UN-WRAPPED so useCreateTodo's onError can detect it by
+ * `name === 'AbortError'` and skip the markFailed/announce cleanup (the Dismiss
+ * path already cleaned up). The try/catch below wraps ONLY the JSON parse.
  */
-export async function createTodo(body: CreateTodoBody): Promise<Todo> {
+export async function createTodo(
+  body: CreateTodoBody,
+  signal?: AbortSignal,
+): Promise<Todo> {
   const response = await fetch('/todos', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: body.id, description: body.description }),
+    signal,
   })
 
   if (!response.ok) {
