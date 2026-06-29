@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { LiveRegion } from './components/primitives'
 import type { LiveRegionHandle } from './components/primitives'
@@ -63,7 +63,14 @@ function App() {
   // the server.
   const [hasEverHadTodos, setHasEverHadTodos] = useState(false)
 
-  const { submit, pendingIds, failedCreates, retry, dismiss } = useCreateTodo({
+  const {
+    submit,
+    pendingIds,
+    failedCreates,
+    retry,
+    dismiss,
+    clearFailedCreates,
+  } = useCreateTodo({
     announce,
     onCreated: () => setHasEverHadTodos(true),
   })
@@ -127,12 +134,30 @@ function App() {
     .filter(Boolean)
     .join(' ')
 
+  const serverIds = useMemo(
+    () => new Set(data?.map((todo) => todo.id) ?? []),
+    [data],
+  )
+  const visibleFailedCreates = failedCreates.filter(
+    (todo) => !serverIds.has(todo.id),
+  )
+
+  useEffect(() => {
+    const reconciledFailedIds = failedCreates
+      .filter((todo) => serverIds.has(todo.id))
+      .map((todo) => todo.id)
+    if (reconciledFailedIds.length > 0) {
+      clearFailedCreates(reconciledFailedIds)
+    }
+  }, [clearFailedCreates, failedCreates, serverIds])
+
   // Failed creates are pinned ABOVE the server list (where new creates prepend).
   // They live in the hook's client state, NOT the ['todos'] cache, so a sibling
-  // success's invalidation refetch can never wipe them (AC 8). The server list is
-  // still never re-sorted client-side.
-  const failedIds = new Set(failedCreates.map((todo) => todo.id))
-  const rows = [...failedCreates, ...(data ?? [])]
+  // success's invalidation refetch can never wipe them (AC 8). If a later refetch
+  // proves the server already committed that id, hide and clear the failed copy so
+  // one task never renders twice.
+  const failedIds = new Set(visibleFailedCreates.map((todo) => todo.id))
+  const rows = [...visibleFailedCreates, ...(data ?? [])]
 
   return (
     <main className={styles.app}>
@@ -171,7 +196,7 @@ function App() {
          * the accessible-clip idiom (NOT display:none/aria-hidden, which would
          * hide it from aria-describedby).
          */}
-        {failedCreates.length > 0 && (
+        {visibleFailedCreates.length > 0 && (
           <p className={styles['visually-hidden']} id={FAILED_CREATE_HELP_ID}>
             {FAILED_CREATE_HELP_TEXT}
           </p>

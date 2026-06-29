@@ -4,7 +4,7 @@ baseline_commit: c6cbf81231fc2e581152262e6d027774f881a282
 
 # Story 1.9: Failed-create recovery
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -74,18 +74,26 @@ so that a typed task is never silently lost and I can recover without losing my 
 - [x] **Gates** (all ACs)
   - [x] Run `npm run typecheck`, `npm test` (workspaces), `npm run test:unit` / `test:integration`, `npm run lint --workspace apps/web`, `npm run lint:css --workspace apps/web`, `npm run contrast:check --workspace apps/web`, and `npm run size:check --workspace apps/web`. This story is **frontend-only** — no backend/contract/schema changes and **no new dependencies** (AbortController is a web standard; the `uuid`/TanStack/React stack already present). Rebaseline `size:check` with `-- --update` only if the genuine additions exceed tolerance.
 
+### Review Findings
+
+- [x] [Review][Patch] Late settlement from the original timed-out request can corrupt an active retry [apps/web/src/hooks/useCreateTodo.ts:199]
+- [x] [Review][Patch] Failed row can be lost if a refetch removes the optimistic cache row before failure handling [apps/web/src/hooks/useCreateTodo.ts:108]
+- [x] [Review][Patch] Dismissed creates can still produce stale empty failure announcements after best-effort abort misses [apps/web/src/hooks/useCreateTodo.ts:122]
+- [x] [Review][Patch] Server row and failed row can duplicate after a commit-with-client-failure refetch [apps/web/src/App.tsx:135]
+
 ## Dev Notes
 
 ### The one critical design decision: failed rows live in client state, NOT the cache
 
-The 1.7/1.8 honest-pending shape keeps optimistic rows in the `['todos']` cache and settles via `onSettled → invalidateQueries(['todos'])` (settle = refetch). **For a failed create that must stay visible, leaving the row in the cache is wrong**: a *sibling* create’s success invalidation refetches the server list, which never contains the failed-only optimistic row, so `setQueryData` from the refetch **wipes the failed row** — breaking AC 8 (the 1.9 analog of 1.7’s mixed-outcome “success settles without clearing the other’s error”).
+The 1.7/1.8 honest-pending shape keeps optimistic rows in the `['todos']` cache and settles via `onSettled → invalidateQueries(['todos'])` (settle = refetch). **For a failed create that must stay visible, leaving the row in the cache is wrong**: a _sibling_ create’s success invalidation refetches the server list, which never contains the failed-only optimistic row, so `setQueryData` from the refetch **wipes the failed row** — breaking AC 8 (the 1.9 analog of 1.7’s mixed-outcome “success settles without clearing the other’s error”).
 
 Resolution:
+
 - **Failed rows live in `useState` (`failedCreates`), not the cache.** On failure, snapshot the pending `Todo` out of the cache into `failedCreates`, then remove it from the cache (per-id, never whole-snapshot). Invalidation can never touch `failedCreates`.
 - **The failure path never invalidates** (`onSettled` invalidates only when `!error`). There is nothing server-side to reconcile for a failed create.
-- **App merges for render**: `rows = [...failedCreates, ...data]`, prepended (failed rows pinned at top, matching where new creates prepend). The frontend still never re-sorts the *server* list (AC 8 of 1.6/1.7 intact) — `failedCreates` is a separate client-only collection.
+- **App merges for render**: `rows = [...failedCreates, ...data]`, prepended (failed rows pinned at top, matching where new creates prepend). The frontend still never re-sorts the _server_ list (AC 8 of 1.6/1.7 intact) — `failedCreates` is a separate client-only collection.
 
-**“In place” nuance (document this for the reviewer):** epics says the row transitions to Failed *in place*. At the moment of failure the row IS in place (full text intact, same visible position). Because failed rows move to a separate collection (to survive invalidation), their exact array index relative to later cache refetches is not strictly preserved — they are pinned at the top of the list. This is the deliberate trade-off that makes AC 8 (mixed-outcome isolation) achievable, and it satisfies the three real contracts of the recovery model: (a) typed text never lost, (b) current typing never overwritten, (c) never silently failed. [Source: ux-design-specification.md#recovery-model (line 417)]
+**“In place” nuance (document this for the reviewer):** epics says the row transitions to Failed _in place_. At the moment of failure the row IS in place (full text intact, same visible position). Because failed rows move to a separate collection (to survive invalidation), their exact array index relative to later cache refetches is not strictly preserved — they are pinned at the top of the list. This is the deliberate trade-off that makes AC 8 (mixed-outcome isolation) achievable, and it satisfies the three real contracts of the recovery model: (a) typed text never lost, (b) current typing never overwritten, (c) never silently failed. [Source: ux-design-specification.md#recovery-model (line 417)]
 
 ### The create lifecycle state machine (what each id can be at any moment)
 
@@ -113,6 +121,7 @@ A naive `setTimeout(…, 10000)` does not fire reliably across a backgrounded ta
 ### Files to touch — current state vs. what to add
 
 **Frontend (this story is frontend-only)**
+
 - `apps/web/src/api/todos.ts` — `createTodo(body)` exists; ADD optional `signal?` param threaded to `fetch`. Leave the `await fetch` un-try/catch’d so `AbortError` propagates. `getTodos`/`patchTodo`/`isTodo` unchanged. [verified]
 - `apps/web/src/hooks/useCreateTodo.ts` — currently: `onError` simply **removes** the row (its own comment says “In 1.7 a failed create simply disappears; the Failed-variant UI, Retry and the ~10s timeout are Story 1.9”). This story REPLACES that removal with `markFailed`, and ADDS the controller map, `failedCreates` state, announce-once guard, deadline map + timeout mechanism, `retry`, `dismiss`, and the injectable clock param. The `onMutate` prepend + `submit` UUIDv7 are unchanged. [verified]
 - `apps/web/src/hooks/usePendingPresentation.ts` — NO changes; IMPORT `PendingClock` + `realClock` from it for the timeout clock. [verified]
@@ -143,7 +152,7 @@ A naive `setTimeout(…, 10000)` does not fire reliably across a backgrounded ta
 3. **AbortError must not be wrapped** — keep `createTodo`’s `await fetch(...)` outside any try/catch so `error.name === 'AbortError'` is detectable in `onError`. The existing try/catch wraps only the JSON parse; leave it that way.
 4. **Announce-once is per-id and survives retries** — a retry that fails again must NOT re-announce (AC 4). The guard set is cleared only on dismiss or successful settle.
 5. **Empty-list + one failed row** — the App surface branch currently keys on `data.length`; switch the populated/empty decision to the merged `rows.length`, or a lone failure shows the empty-state and the failed row vanishes.
-6. **First-interactive invariant** — failed rows render in the list *below* the capture input (the input sits above the surface). The Retry/Dismiss buttons must not precede the input in DOM order. Keep `App.firstInteractive.test.tsx` green.
+6. **First-interactive invariant** — failed rows render in the list _below_ the capture input (the input sits above the surface). The Retry/Dismiss buttons must not precede the input in DOM order. Keep `App.firstInteractive.test.tsx` green.
 7. **Curly apostrophe/quotes** — match existing copy: `Couldn’t save ‘{description}’. Use Retry to try again.` (U+2019 / U+2018 / U+2019). Compare with `LOAD_FAILURE_MESSAGE` and the 1.8 toggle-failure string.
 8. **Failed rows are inert for toggle** — render the failed variant as a non-`<label>` row so a tap doesn’t attempt a toggle on a non-existent server item (UX line 999). Only Retry/Dismiss are interactive.
 9. **`beforeunload` needs both `preventDefault()` and `e.returnValue = ''`** for cross-browser prompting; attach/detach is the only assertable behavior (AC 7).
@@ -217,7 +226,7 @@ claude-opus-4-8[1m] (Claude Opus 4.8, 1M context) via the bmad-dev-story workflo
 
 ## Change Log
 
-| Date | Change |
-| --- | --- |
-| 2026-06-27 | Story 1.9 created — failed-create recovery (Failed row variant, Retry/Dismiss + per-row AbortController, announce-once, aria-describedby, beforeunload, wall-clock ~10s timeout). Status → ready-for-dev. |
+| Date       | Change                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-06-27 | Story 1.9 created — failed-create recovery (Failed row variant, Retry/Dismiss + per-row AbortController, announce-once, aria-describedby, beforeunload, wall-clock ~10s timeout). Status → ready-for-dev.                                                                                                                                                                                          |
 | 2026-06-28 | Story 1.9 implemented — `createTodo` AbortSignal; `useCreateTodo` full lifecycle (failedCreates state, controller/deadline maps, markFailed/retry/dismiss, wall-clock timeout via injectable clock + visibilitychange); App merge/beforeunload/hidden help text; TodoList/TodoItem Failed variant + styles. Tests added across api/hook/component/App. All gates green (Node 24). Status → review. |

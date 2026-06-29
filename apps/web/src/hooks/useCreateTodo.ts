@@ -61,6 +61,20 @@ interface MutationContext {
   previous: Todo[] | undefined
 }
 
+interface CreateTodoMutationBody extends CreateTodoBody {
+  attemptId: number
+}
+
+interface AttemptController {
+  attemptId: number
+  controller: AbortController
+}
+
+interface AttemptDeadline {
+  attemptId: number
+  deadlineMs: number
+}
+
 export function useCreateTodo({
   announce,
   onCreated,
@@ -79,13 +93,25 @@ export function useCreateTodo({
 
   // Per-id AbortController (Dismiss aborts the in-flight POST). Created on submit/
   // retry, dropped on settle/dismiss.
-  const controllersRef = useRef<Map<string, AbortController>>(new Map())
+  const controllersRef = useRef<Map<string, AttemptController>>(new Map())
   // Ids already announced as failed — the announce-once guard (AC 4). Survives a
   // retry that fails again; cleared only on dismiss or a successful settle.
   const announcedRef = useRef<Set<string>>(new Set())
-  // id → wall-clock deadline (ms) for the ~10s timeout. Set on submit/retry,
-  // deleted on settle/markFailed/dismiss.
-  const deadlineRef = useRef<Map<string, number>>(new Map())
+  // id → active attempt. Retry reuses the same todo id while an older timed-out
+  // request can still be in flight, so every network attempt also gets its own
+  // monotonically increasing attempt id.
+  const activeAttemptRef = useRef<Map<string, number>>(new Map())
+  const nextAttemptIdRef = useRef(0)
+  // id → the last submitted row snapshot. This survives cache refetches, so a
+  // later failure can still render the Failed row with the user's text intact.
+  const submittedRowsRef = useRef<Map<string, Todo>>(new Map())
+  // id → wall-clock deadline for the active attempt. Set on submit/retry, deleted
+  // on settle/markFailed/dismiss.
+  const deadlineRef = useRef<Map<string, AttemptDeadline>>(new Map())
+  // Terminal guards for late settlements after a Dismiss or after any attempt for
+  // this id has already succeeded.
+  const dismissedRef = useRef<Set<string>>(new Set())
+  const completedRef = useRef<Set<string>>(new Set())
 
   function addPending(id: string) {
     setPendingIds((prev) => new Set(prev).add(id))
@@ -100,29 +126,70 @@ export function useCreateTodo({
     })
   }
 
+  function nextAttemptId() {
+    nextAttemptIdRef.current += 1
+    return nextAttemptIdRef.current
+  }
+
+  function isActiveAttempt(body: CreateTodoMutationBody) {
+    return activeAttemptRef.current.get(body.id) === body.attemptId
+  }
+
+  function cleanupAttempt(body: CreateTodoMutationBody) {
+    const controller = controllersRef.current.get(body.id)
+    if (controller?.attemptId === body.attemptId) {
+      controllersRef.current.delete(body.id)
+    }
+    const deadline = deadlineRef.current.get(body.id)
+    if (deadline?.attemptId === body.attemptId) {
+      deadlineRef.current.delete(body.id)
+    }
+    if (activeAttemptRef.current.get(body.id) === body.attemptId) {
+      activeAttemptRef.current.delete(body.id)
+    }
+  }
+
   // Move a pending row to the Failed state — used by BOTH the mutation onError
-  // path and the timeout path, so it MUST be idempotent. Snapshot the row out of
-  // the cache into failedCreates, remove it from the cache (per-id, never a
-  // whole-snapshot restore — that would clobber siblings), drop its pending id +
-  // deadline, and announce ONCE.
-  function markFailed(id: string) {
+  // path and the timeout path, so it MUST be idempotent. Prefer the current cache
+  // row, but fall back to the submitted snapshot if a sibling success/refetch has
+  // already replaced the cache. On timeout we keep the controller so Dismiss can
+  // still abort the original in-flight request; on network error the request has
+  // settled, so its controller can be dropped.
+  function markFailed(
+    id: string,
+    attemptId: number,
+    { keepController }: { keepController: boolean },
+  ) {
+    if (activeAttemptRef.current.get(id) !== attemptId) return
     const cached = queryClient.getQueryData<Todo[]>(['todos'])
     const cachedRow = cached?.find((todo) => todo.id === id)
-    if (cachedRow) {
-      setFailedCreates((prev) =>
-        prev.some((todo) => todo.id === id) ? prev : [...prev, cachedRow],
-      )
-      queryClient.setQueryData<Todo[]>(['todos'], (old) =>
-        (old ?? []).filter((todo) => todo.id !== id),
-      )
-    }
+    const failedRow = cachedRow ?? submittedRowsRef.current.get(id)
+    if (!failedRow) return
+
+    setFailedCreates((prev) =>
+      prev.some((todo) => todo.id === id) ? prev : [...prev, failedRow],
+    )
+    queryClient.setQueryData<Todo[]>(['todos'], (old) =>
+      (old ?? []).filter((todo) => todo.id !== id),
+    )
     removePending(id)
-    deadlineRef.current.delete(id)
+    activeAttemptRef.current.delete(id)
+    const deadline = deadlineRef.current.get(id)
+    if (deadline?.attemptId === attemptId) {
+      deadlineRef.current.delete(id)
+    }
+    if (!keepController) {
+      const controller = controllersRef.current.get(id)
+      if (controller?.attemptId === attemptId) {
+        controllersRef.current.delete(id)
+      }
+    }
 
     if (!announcedRef.current.has(id)) {
-      const description = cachedRow?.description ?? ''
       // Curly apostrophe/quotes to match the existing failure copy.
-      announce?.(`Couldn’t save ‘${description}’. Use Retry to try again.`)
+      announce?.(
+        `Couldn’t save ‘${failedRow.description}’. Use Retry to try again.`,
+      )
       announcedRef.current.add(id)
     }
   }
@@ -132,15 +199,45 @@ export function useCreateTodo({
   function checkDeadlines() {
     const now = clock.now()
     for (const [id, deadline] of [...deadlineRef.current]) {
-      if (now >= deadline) {
-        markFailed(id)
+      if (now >= deadline.deadlineMs) {
+        markFailed(id, deadline.attemptId, { keepController: true })
       }
     }
   }
 
-  const mutation = useMutation<Todo, Error, CreateTodoBody, MutationContext>({
+  function completeCreate(body: CreateTodoMutationBody) {
+    if (
+      dismissedRef.current.has(body.id) ||
+      completedRef.current.has(body.id)
+    ) {
+      return
+    }
+    completedRef.current.add(body.id)
+    announce?.(`${body.description} added.`)
+    onCreated?.()
+    setFailedCreates((prev) => prev.filter((todo) => todo.id !== body.id))
+    removePending(body.id)
+    announcedRef.current.delete(body.id)
+    submittedRowsRef.current.delete(body.id)
+    activeAttemptRef.current.delete(body.id)
+    controllersRef.current.delete(body.id)
+    deadlineRef.current.delete(body.id)
+    void queryClient.invalidateQueries({ queryKey: ['todos'] })
+  }
+
+  const mutation = useMutation<
+    Todo,
+    Error,
+    CreateTodoMutationBody,
+    MutationContext
+  >({
     mutationFn: (body) =>
-      createTodo(body, controllersRef.current.get(body.id)?.signal),
+      createTodo(
+        body,
+        controllersRef.current.get(body.id)?.attemptId === body.attemptId
+          ? controllersRef.current.get(body.id)?.controller.signal
+          : undefined,
+      ),
 
     onMutate: async (body) => {
       // Stop any in-flight list refetch from overwriting our optimistic write.
@@ -157,19 +254,31 @@ export function useCreateTodo({
         createdAt: now,
         updatedAt: now,
       }
+      dismissedRef.current.delete(body.id)
+      completedRef.current.delete(body.id)
+      submittedRowsRef.current.set(body.id, pendingTodo)
+      activeAttemptRef.current.set(body.id, body.attemptId)
 
       // Immutable write, new array reference. Prepend = top of the list.
-      queryClient.setQueryData<Todo[]>(['todos'], (old) => [
-        pendingTodo,
-        ...(old ?? []),
-      ])
+      queryClient.setQueryData<Todo[]>(['todos'], (old) => {
+        const withoutDuplicate = (old ?? []).filter(
+          (todo) => todo.id !== body.id,
+        )
+        return [pendingTodo, ...withoutDuplicate]
+      })
       addPending(body.id)
 
       // Fresh per-id controller + wall-clock deadline for THIS attempt (covers a
       // retry, which re-enters onMutate with the same id after settle cleared the
       // previous controller/deadline).
-      controllersRef.current.set(body.id, new AbortController())
-      deadlineRef.current.set(body.id, clock.now() + CREATE_TIMEOUT_MS)
+      controllersRef.current.set(body.id, {
+        attemptId: body.attemptId,
+        controller: new AbortController(),
+      })
+      deadlineRef.current.set(body.id, {
+        attemptId: body.attemptId,
+        deadlineMs: clock.now() + CREATE_TIMEOUT_MS,
+      })
 
       return { previous }
     },
@@ -179,39 +288,37 @@ export function useCreateTodo({
       // Do NOT mark failed and do NOT announce (the native AbortError propagates
       // un-wrapped from createTodo so we can detect it here).
       if (error.name === 'AbortError') return
-      markFailed(body.id)
+      if (
+        dismissedRef.current.has(body.id) ||
+        completedRef.current.has(body.id) ||
+        !isActiveAttempt(body)
+      ) {
+        return
+      }
+      markFailed(body.id, body.attemptId, { keepController: false })
       // Deliberately NO invalidate on failure: nothing server-side to reconcile,
       // and invalidation would refetch and wipe sibling failed rows (AC 8).
     },
 
     onSuccess: (_created, body) => {
-      // The submitted text is the disambiguator. No announcement on pending.
-      announce?.(`${body.description} added.`)
-      onCreated?.()
-      // Covers timeout→Failed→late-success: the original request eventually
-      // succeeded, so clear all failed-state for the id. onSettled's invalidation
-      // then refetches the now-persisted task from the server.
-      setFailedCreates((prev) => prev.filter((todo) => todo.id !== body.id))
-      announcedRef.current.delete(body.id)
-      deadlineRef.current.delete(body.id)
+      // Any successful attempt for this id means the server has the task. This also
+      // covers timeout→Failed→Retry where the original request succeeds late: retire
+      // the recovery UI and ignore later settlements for redundant attempts.
+      completeCreate(body)
     },
 
-    onSettled: (_data, error, body) => {
-      removePending(body.id)
-      controllersRef.current.delete(body.id)
-      deadlineRef.current.delete(body.id)
-      // Settle = invalidate, NOT merge (1.7) — but ONLY on success. The failure
-      // path skips invalidation to protect sibling failed rows (AC 8).
-      if (!error) {
-        void queryClient.invalidateQueries({ queryKey: ['todos'] })
+    onSettled: (_data, _error, body) => {
+      if (isActiveAttempt(body)) {
+        removePending(body.id)
       }
+      cleanupAttempt(body)
     },
   })
 
   // Generate a fresh UUIDv7 per submit so even an accidental resubmit of the same
   // text is a DISTINCT todo (never a duplicate-id collision).
   function submit(description: string) {
-    mutation.mutate({ id: uuidv7(), description })
+    mutation.mutate({ id: uuidv7(), description, attemptId: nextAttemptId() })
   }
 
   // Re-attempt a failed create with the SAME id (server is idempotent on id →
@@ -223,22 +330,31 @@ export function useCreateTodo({
     const failed = failedCreates.find((todo) => todo.id === id)
     if (!failed) return
     setFailedCreates((prev) => prev.filter((todo) => todo.id !== id))
-    mutation.mutate({ id, description: failed.description })
+    dismissedRef.current.delete(id)
+    mutation.mutate({
+      id,
+      description: failed.description,
+      attemptId: nextAttemptId(),
+    })
   }
 
   // Remove a failed row and abort any in-flight request for it (best-effort: if
   // the POST already completed server-side, the task reappears on the next
   // refetch — server-of-truth reconciliation, AC 3).
   function dismiss(id: string) {
+    dismissedRef.current.add(id)
     const controller = controllersRef.current.get(id)
     if (controller) {
-      controller.abort()
+      controller.controller.abort()
       controllersRef.current.delete(id)
     }
     setFailedCreates((prev) => prev.filter((todo) => todo.id !== id))
     removePending(id)
     announcedRef.current.delete(id)
     deadlineRef.current.delete(id)
+    activeAttemptRef.current.delete(id)
+    submittedRowsRef.current.delete(id)
+    completedRef.current.delete(id)
     // Ensure it is absent from the cache (covers a timeout-then-dismiss where the
     // row might otherwise still be present).
     queryClient.setQueryData<Todo[]>(['todos'], (old) =>
@@ -250,7 +366,9 @@ export function useCreateTodo({
   // whenever pendingIds changes (every deadline set/delete coincides with a
   // pending add/remove), so the timer always tracks the nearest deadline.
   useEffect(() => {
-    const deadlines = [...deadlineRef.current.values()]
+    const deadlines = [...deadlineRef.current.values()].map(
+      (deadline) => deadline.deadlineMs,
+    )
     if (deadlines.length === 0) return
     const soonest = Math.min(...deadlines)
     const delay = Math.max(0, soonest - clock.now())
@@ -275,5 +393,24 @@ export function useCreateTodo({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- checkDeadlines only touches stable refs/setters; re-subscribing each render is unnecessary.
   }, [clock])
 
-  return { submit, pendingIds, failedCreates, retry, dismiss }
+  function clearFailedCreates(ids: readonly string[]) {
+    const idSet = new Set(ids)
+    if (idSet.size === 0) return
+    setFailedCreates((prev) => prev.filter((todo) => !idSet.has(todo.id)))
+    for (const id of idSet) {
+      announcedRef.current.delete(id)
+      submittedRowsRef.current.delete(id)
+      dismissedRef.current.delete(id)
+      completedRef.current.add(id)
+    }
+  }
+
+  return {
+    submit,
+    pendingIds,
+    failedCreates,
+    retry,
+    dismiss,
+    clearFailedCreates,
+  }
 }

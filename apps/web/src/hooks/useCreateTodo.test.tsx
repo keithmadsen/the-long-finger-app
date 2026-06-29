@@ -402,6 +402,61 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
     expect(cache.map((t) => t.description)).not.toContain('bad')
   })
 
+  it('preserves failed text when a sibling success refetch removes the optimistic cache row before failure', async () => {
+    const client = createTestQueryClient()
+    client.setQueryData<Todo[]>(['todos'], [])
+    let serverTodos: Todo[] = []
+    let resolveBad: ((response: Response) => void) | undefined
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (!init || init.method === undefined || init.method === 'GET') {
+        return new Response(JSON.stringify(serverTodos), { status: 200 })
+      }
+      const body = JSON.parse(init.body as string) as {
+        id: string
+        description: string
+      }
+      if (body.description === 'bad after refetch') {
+        return new Promise<Response>((resolve) => {
+          resolveBad = resolve
+        })
+      }
+      const created: Todo = {
+        id: body.id,
+        description: body.description,
+        completed: false,
+        createdAt: '2026-06-28T12:30:00.000Z',
+        updatedAt: '2026-06-28T12:30:00.000Z',
+      }
+      serverTodos = [created]
+      return new Response(JSON.stringify(created), { status: 201 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const announce = vi.fn()
+
+    const { result } = setupWithObserver(client, announce)
+    act(() => {
+      result.current.create.submit('bad after refetch')
+      result.current.create.submit('good')
+    })
+
+    await waitFor(() => {
+      const cache = client.getQueryData<Todo[]>(['todos']) ?? []
+      expect(cache.map((t) => t.description)).toEqual(['good'])
+    })
+
+    await act(async () => {
+      resolveBad?.(new Response('', { status: 500 }))
+      await Promise.resolve()
+    })
+
+    await waitFor(() =>
+      expect(
+        result.current.create.failedCreates.map((t) => t.description),
+      ).toContain('bad after refetch'),
+    )
+    expect(announce).toHaveBeenCalledWith(FAIL_MESSAGE('bad after refetch'))
+  })
+
   it('the wall-clock timeout fails a still-pending create via the armed timer, WITHOUT aborting it (AC 6)', async () => {
     const clock = makeFakeClock()
     const client = createTestQueryClient()
@@ -513,9 +568,7 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
       clock.advance(CREATE_TIMEOUT_MS + 1)
       clock.runDue()
     })
-    await waitFor(() =>
-      expect(result.current.failedCreates).toHaveLength(1),
-    )
+    await waitFor(() => expect(result.current.failedCreates).toHaveLength(1))
     expect(announce).toHaveBeenCalledTimes(1)
     const id = result.current.failedCreates[0]!.id
 
@@ -585,5 +638,106 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
 
     await waitFor(() => expect(result.current.failedCreates).toHaveLength(0))
     expect(announce).toHaveBeenCalledWith('eventually saves added.')
+  })
+
+  it('a stale original failure after timeout→Retry does not corrupt the active retry deadline', async () => {
+    const clock = makeFakeClock()
+    const client = createTestQueryClient()
+    client.setQueryData<Todo[]>(['todos'], [])
+    const posts: Array<{
+      resolve: (response: Response) => void
+      body: { id: string; description: string }
+    }> = []
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (!init || init.method === undefined || init.method === 'GET') {
+        return new Response(JSON.stringify([]), { status: 200 })
+      }
+      const body = JSON.parse(init.body as string) as {
+        id: string
+        description: string
+      }
+      return new Promise<Response>((resolve) => {
+        posts.push({ resolve, body })
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const announce = vi.fn()
+
+    const { result } = setup(client, announce, clock)
+    act(() => result.current.submit('retry race'))
+    await waitFor(() =>
+      expect(client.getQueryData<Todo[]>(['todos'])).toHaveLength(1),
+    )
+
+    act(() => {
+      clock.advance(CREATE_TIMEOUT_MS + 1)
+      clock.runDue()
+    })
+    await waitFor(() => expect(result.current.failedCreates).toHaveLength(1))
+    const id = result.current.failedCreates[0]!.id
+
+    act(() => result.current.retry(id))
+    await waitFor(() => expect(result.current.pendingIds.has(id)).toBe(true))
+    expect(posts).toHaveLength(2)
+
+    await act(async () => {
+      posts[0]!.resolve(new Response('', { status: 500 }))
+      await Promise.resolve()
+    })
+
+    expect(result.current.pendingIds.has(id)).toBe(true)
+    expect(result.current.failedCreates).toHaveLength(0)
+
+    act(() => {
+      clock.advance(CREATE_TIMEOUT_MS + 1)
+      clock.runDue()
+    })
+
+    await waitFor(() =>
+      expect(result.current.failedCreates.map((t) => t.description)).toContain(
+        'retry race',
+      ),
+    )
+    expect(announce).toHaveBeenCalledTimes(1)
+  })
+
+  it('a stale non-abort failure after Dismiss does not re-add or re-announce the row', async () => {
+    const clock = makeFakeClock()
+    const client = createTestQueryClient()
+    client.setQueryData<Todo[]>(['todos'], [])
+    let resolvePost: ((response: Response) => void) | undefined
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (!init || init.method === undefined || init.method === 'GET') {
+        return new Response(JSON.stringify([]), { status: 200 })
+      }
+      return new Promise<Response>((resolve) => {
+        resolvePost = resolve
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const announce = vi.fn()
+
+    const { result } = setup(client, announce, clock)
+    act(() => result.current.submit('dismiss race'))
+    await waitFor(() =>
+      expect(client.getQueryData<Todo[]>(['todos'])).toHaveLength(1),
+    )
+    act(() => {
+      clock.advance(CREATE_TIMEOUT_MS + 1)
+      clock.runDue()
+    })
+    await waitFor(() => expect(result.current.failedCreates).toHaveLength(1))
+    const id = result.current.failedCreates[0]!.id
+
+    act(() => result.current.dismiss(id))
+    await waitFor(() => expect(result.current.failedCreates).toHaveLength(0))
+
+    await act(async () => {
+      resolvePost?.(new Response('', { status: 500 }))
+      await Promise.resolve()
+    })
+
+    expect(result.current.failedCreates).toHaveLength(0)
+    expect(announce).toHaveBeenCalledTimes(1)
   })
 })
