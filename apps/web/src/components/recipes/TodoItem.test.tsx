@@ -214,6 +214,80 @@ describe('TodoItem', () => {
     })
   })
 
+  describe('Failed variant (Story 1.9)', () => {
+    it('renders the failed variant: left-border class, full-contrast text, empty checkbox slot, aria-describedby, aria-busy false', () => {
+      render(
+        <TodoItem
+          describedById="help-1"
+          failed
+          onDismiss={vi.fn()}
+          onRetry={vi.fn()}
+          todo={makeTodo()}
+        />,
+      )
+
+      const container = screen.getByText('Buy milk').closest('div')
+      // The .failed left-border marker, and NO pending/complete colour rule.
+      expect(classNameOf(container)).toMatch(/failed/)
+      expect(classNameOf(container)).not.toMatch(/pending/)
+      expect(classNameOf(container)).not.toMatch(/complete/)
+      // References the shared hidden help text (AC 5).
+      expect(container).toHaveAttribute('aria-describedby', 'help-1')
+      // No server item to toggle → empty checkbox slot (no checkbox control).
+      expect(screen.queryByRole('checkbox')).toBeNull()
+      // Not busy, not a toggle row.
+      expect(screen.getByRole('listitem')).not.toHaveAttribute('aria-busy')
+      // Retry + Dismiss affordances.
+      expect(
+        screen.getByRole('button', { name: 'Retry' }),
+      ).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: 'Dismiss' }),
+      ).toBeInTheDocument()
+    })
+
+    it('Retry calls onRetry, Dismiss calls onDismiss, and neither path toggles', async () => {
+      const user = userEvent.setup()
+      const onRetry = vi.fn()
+      const onDismiss = vi.fn()
+      const onToggle = vi.fn()
+      render(
+        <TodoItem
+          failed
+          onDismiss={onDismiss}
+          onRetry={onRetry}
+          onToggle={onToggle}
+          todo={makeTodo()}
+        />,
+      )
+
+      await user.click(screen.getByRole('button', { name: 'Retry' }))
+      await user.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+      expect(onRetry).toHaveBeenCalledTimes(1)
+      expect(onDismiss).toHaveBeenCalledTimes(1)
+      expect(onToggle).not.toHaveBeenCalled()
+    })
+
+    it('clicking the row text does not toggle — the failed row is inert (UX line 999)', async () => {
+      const user = userEvent.setup()
+      const onToggle = vi.fn()
+      render(
+        <TodoItem
+          failed
+          onDismiss={vi.fn()}
+          onRetry={vi.fn()}
+          onToggle={onToggle}
+          todo={makeTodo()}
+        />,
+      )
+
+      await user.click(screen.getByText('Buy milk'))
+
+      expect(onToggle).not.toHaveBeenCalled()
+    })
+  })
+
   it('applies the 2-line line-clamp markup to a long description (AC 4)', () => {
     const longText =
       'This is a deliberately very long task description that would wrap well past two lines if it were not clamped at the boundary'

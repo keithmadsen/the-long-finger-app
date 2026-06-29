@@ -79,3 +79,58 @@
 .item:not(.pending) .description {
   transition: color var(--motion-settle) var(--motion-ease);
 }
+
+/*
+ * Failed variant (Story 1.9, AC 1). A 4px error left-border marks the row; the
+ * height stays stable (min-height inherited from .item, UX-DR22). The description
+ * stays --color-on-surface (full contrast — no .pending/.complete rule applies),
+ * so a failed task reads at full weight, never muted. There is no 4px length
+ * token; the spec commits this exact width, so the literal is the one sanctioned
+ * raw length here (the token lint only constrains spacing/sizing properties, not
+ * border-left). The row itself is inert (not a tap target) → default cursor.
+ */
+.failed {
+  border-left: 4px solid var(--color-error);
+  padding-inline-start: var(--space-3);
+  cursor: default;
+}
+
+/*
+ * Empty checkbox slot — there is no server item to toggle, but the slot reserves
+ * the checkbox's footprint (--space-5, matching the Checkbox indicator) so the
+ * text aligns with every other row and the row height is unchanged.
+ */
+.slot {
+  flex: none;
+  width: var(--space-5);
+  height: var(--space-5);
+}
+
+/* Retry + Dismiss sit at the right edge of the row. */
+.affordances {
+  display: flex;
+  flex: none;
+  gap: var(--space-3);
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+/*
+ * Affordance text colours (AC 1). Scoped under .failed so they out-specify the
+ * Button primitive's base .button colour regardless of stylesheet order — the
+ * primitive still owns the focus ring, the click guard, and its forced-colors
+ * border (we keep that border visible, not stripped).
+ */
+.failed .retry {
+  color: var(--color-accent);
+}
+
+.failed .dismiss {
+  color: var(--color-on-surface-muted);
+}
+
+.failed .retry,
+.failed .dismiss {
+  font-size: var(--font-size-secondary);
+  font-weight: var(--font-weight-medium);
+}

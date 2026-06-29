@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from 'react'
 import type { Todo } from '@tlf/contracts'
 
-import { Checkbox } from '../primitives'
+import { Button, Checkbox } from '../primitives'
 import { usePendingPresentation } from '../../hooks/usePendingPresentation'
 import styles from './TodoItem.module.css'
 
@@ -17,6 +17,18 @@ export interface TodoItemProps {
   pendingCompleted?: boolean
   /** Toggle this row's completion (Story 1.8). The arg is the destination state. */
   onToggle?: (completed: boolean) => void
+  /**
+   * Failed-create variant (Story 1.9). When true the row is NOT a toggle <label>
+   * (there is no server item to toggle, UX line 999): an empty checkbox slot,
+   * full-contrast text, a left-border marker, and Retry + Dismiss affordances.
+   */
+  failed?: boolean
+  /** Re-attempt the failed create with the same id (Story 1.9). */
+  onRetry?: () => void
+  /** Remove the failed row + abort any in-flight request (Story 1.9). */
+  onDismiss?: () => void
+  /** Id of the shared hidden help text a failed row references (AC 5). */
+  describedById?: string
 }
 
 /*
@@ -57,9 +69,42 @@ export function TodoItem({
   pending = false,
   pendingCompleted,
   onToggle,
+  failed = false,
+  onRetry,
+  onDismiss,
+  describedById,
 }: TodoItemProps) {
   const { ariaBusy, showPending } = usePendingPresentation(pending)
   const checked = pendingCompleted ?? todo.completed
+
+  /*
+   * Failed variant (Story 1.9). A DISTINCT internal branch (sanctioned by UX line
+   * 815) — NOT the Active/Complete/Pending <label> row (the 1.8 contract, left
+   * untouched). It is inert for toggle (no onToggle, no wrapping <label>): only
+   * Retry/Dismiss are interactive. aria-busy is false; the row is not
+   * aria-disabled. An empty checkbox slot preserves the row height (UX-DR22).
+   */
+  if (failed) {
+    return (
+      <li role="listitem">
+        <div
+          aria-describedby={describedById}
+          className={[styles.item, styles.failed].filter(Boolean).join(' ')}
+        >
+          <span aria-hidden="true" className={styles.slot} />
+          <span className={styles.description}>{todo.description}</span>
+          <div className={styles.affordances}>
+            <Button className={styles.retry} onClick={onRetry}>
+              Retry
+            </Button>
+            <Button className={styles.dismiss} onClick={onDismiss}>
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      </li>
+    )
+  }
 
   const className = [
     styles.item,

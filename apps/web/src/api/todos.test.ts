@@ -85,6 +85,38 @@ describe('createTodo', () => {
       'POST /todos returned a malformed response body',
     )
   })
+
+  it('forwards the AbortSignal to fetch (Story 1.9 AC 3)', async () => {
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify(CREATED), { status: 201 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const controller = new AbortController()
+
+    await createTodo(BODY, controller.signal)
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(init.signal).toBe(controller.signal)
+  })
+
+  it('lets an aborted fetch reject with the AbortError un-wrapped (name preserved) (Story 1.9 AC 3)', async () => {
+    // fetch itself throws a DOMException named 'AbortError' when the signal is
+    // aborted — BEFORE the response.ok check. createTodo must NOT wrap it, so the
+    // mutation's onError can detect it by name and skip the failed-row cleanup.
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.signal?.aborted) {
+        throw new DOMException('The operation was aborted.', 'AbortError')
+      }
+      return new Response(JSON.stringify(CREATED), { status: 201 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(createTodo(BODY, controller.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+  })
 })
 
 describe('patchTodo (Story 1.8)', () => {

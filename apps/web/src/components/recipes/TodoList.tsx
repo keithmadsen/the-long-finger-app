@@ -11,6 +11,14 @@ export interface TodoListProps {
   togglingCompletedById?: Readonly<Record<string, boolean>>
   /** Toggle a row's completion (1.8). Wired by App to useToggleTodo. */
   onToggle?: (id: string, completed: boolean) => void
+  /** Ids in the Failed-create state — each maps to a Failed <TodoItem> (1.9). */
+  failedIds?: ReadonlySet<string>
+  /** Re-attempt a failed create by id (1.9). */
+  onRetry?: (id: string) => void
+  /** Dismiss a failed row by id (1.9). */
+  onDismiss?: (id: string) => void
+  /** Id of the shared hidden help text every failed row references (AC 5). */
+  describedById?: string
 }
 
 /*
@@ -31,21 +39,35 @@ export function TodoList({
   pendingIds,
   togglingCompletedById,
   onToggle,
+  failedIds,
+  onRetry,
+  onDismiss,
+  describedById,
 }: TodoListProps) {
   return (
     <ul className={styles.list} role="list">
-      {todos.map((todo) => (
-        <TodoItem
-          key={todo.id}
-          onToggle={(completed) => onToggle?.(todo.id, completed)}
-          pendingCompleted={togglingCompletedById?.[todo.id]}
-          pending={
-            (pendingIds?.has(todo.id) ?? false) ||
-            togglingCompletedById?.[todo.id] !== undefined
-          }
-          todo={todo}
-        />
-      ))}
+      {todos.map((todo) => {
+        // A failed row is rendered as the Failed variant and is NEVER also
+        // treated as pending/toggling (it has no in-flight create or server item).
+        const isFailed = failedIds?.has(todo.id) ?? false
+        return (
+          <TodoItem
+            key={todo.id}
+            describedById={describedById}
+            failed={isFailed}
+            onDismiss={() => onDismiss?.(todo.id)}
+            onRetry={() => onRetry?.(todo.id)}
+            onToggle={(completed) => onToggle?.(todo.id, completed)}
+            pendingCompleted={isFailed ? undefined : togglingCompletedById?.[todo.id]}
+            pending={
+              !isFailed &&
+              ((pendingIds?.has(todo.id) ?? false) ||
+                togglingCompletedById?.[todo.id] !== undefined)
+            }
+            todo={todo}
+          />
+        )
+      })}
     </ul>
   )
 }
