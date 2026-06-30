@@ -1,5 +1,6 @@
 import type { Todo } from '@tlf/contracts'
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
@@ -69,6 +70,41 @@ describe('first-interactive-element invariant (AC 1, 15)', () => {
     // The assertion is meaningful only because later interactive elements (the
     // row checkboxes) exist — the input genuinely comes first, not merely alone.
     expect(interactive.length).toBeGreaterThan(1)
+  })
+
+  it('the capture input stays first and the unread-error indicator is second when a failed-create row exists (Story 1.10 AC 1)', async () => {
+    // GET returns empty; POST 500s so a create fails and the indicator appears.
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (!init || init.method === undefined || init.method === 'GET') {
+        return okResponse([])
+      }
+      return new Response('', { status: 500 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const user = userEvent.setup()
+    const { container } = renderWithClient(<App />)
+    await screen.findByText('Your list will appear here.')
+
+    const input = screen.getByPlaceholderText(CAPTURE_PLACEHOLDER)
+    await user.click(input)
+    await user.keyboard('save me')
+    await user.keyboard('{Enter}')
+
+    // The indicator (a button) and the failed row's Retry/Dismiss are now present.
+    await screen.findByRole('button', {
+      name: '1 error above. Press Enter to view the first failed task.',
+    })
+
+    const interactive = container.querySelectorAll(INTERACTIVE_SELECTOR)
+    // Order: input → indicator → the failed row's Retry/Dismiss.
+    expect(interactive[0]).toBe(input)
+    expect(interactive[1]).toBe(
+      screen.getByRole('button', {
+        name: '1 error above. Press Enter to view the first failed task.',
+      }),
+    )
+    expect(interactive.length).toBeGreaterThan(2)
   })
 
   it('the capture input is the first interactive element in the FAILED state', async () => {

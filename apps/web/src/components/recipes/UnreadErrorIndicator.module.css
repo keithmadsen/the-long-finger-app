@@ -1,0 +1,17 @@
+/*
+ * Story 1.10 unread-error indicator. A text affordance over the shared <Button>
+ * primitive, which already supplies padding / hit-area / focus-ring / forced-
+ * colors border. This class only overrides the typography to the error style:
+ * the label TEXT ("N errors above") carries the meaning, so under
+ * forced-colors: active the system overriding --color-error is acceptable
+ * (label-change, not colour, per UX-DR26 / Story 1.9 discipline).
+ *
+ * align-self: flex-start aligns the indicator with the input's first line inside
+ * the captureRow flex row (the char-counter can sit beneath the input).
+ */
+.indicator {
+  align-self: flex-start;
+  color: var(--color-error);
+  font-size: var(--font-size-secondary);
+  font-weight: var(--font-weight-medium);
+}

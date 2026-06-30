@@ -94,7 +94,19 @@ export function TodoItem({
           <span aria-hidden="true" className={styles.slot} />
           <span className={styles.description}>{todo.description}</span>
           <div className={styles.affordances}>
-            <Button className={styles.retry} onClick={onRetry}>
+            {/*
+             * data-failed-retry lets App find the FIRST failed row's Retry by a
+             * stable selector (failed rows are pinned at the top, so document
+             * order makes the first match the first failed row) to scroll + focus
+             * it from the unread-error indicator (Story 1.10 AC 2). The <Button>
+             * primitive spreads unknown props onto the native <button>, so the
+             * attribute lands on the DOM node.
+             */}
+            <Button
+              className={styles.retry}
+              data-failed-retry
+              onClick={onRetry}
+            >
               Retry
             </Button>
             <Button className={styles.dismiss} onClick={onDismiss}>

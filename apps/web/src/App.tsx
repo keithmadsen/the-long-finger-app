@@ -5,6 +5,7 @@ import type { LiveRegionHandle } from './components/primitives'
 import { CaptureInput } from './components/recipes/CaptureInput'
 import { EmptyState } from './components/recipes/EmptyState'
 import { TodoList } from './components/recipes/TodoList'
+import { UnreadErrorIndicator } from './components/recipes/UnreadErrorIndicator'
 import { useCreateTodo } from './hooks/useCreateTodo'
 import { useToggleTodo } from './hooks/useToggleTodo'
 import { useTodos } from './hooks/useTodos'
@@ -40,8 +41,14 @@ const FAILED_CREATE_HELP_TEXT =
  * Story 1.9 adds failed-create recovery here: the merged render list
  * ([...failedCreates, ...data]), the shared hidden aria-describedby help text,
  * and the beforeunload guard that is active while any create is in the Failed
- * state. Explicitly NOT here (later stories): the unread-error indicator (1.10),
- * delete (Epic 2). Do not stub them.
+ * state.
+ *
+ * Story 1.10 adds the unread-error indicator here: a focusable "N error(s)
+ * above" affordance rendered to the RIGHT of the capture input (input stays
+ * first in DOM order — first-interactive invariant), the App-owned
+ * unread/acknowledged + focus-visibility state, and the activate handler that
+ * scrolls + focuses the first failed row's Retry. Explicitly NOT here (later
+ * stories): delete (Epic 2). Do not stub it.
  */
 function App() {
   const { data, isPending, isError, refetch } = useTodos()
@@ -62,6 +69,22 @@ function App() {
   // never reappears once any todo has existed, including seeded lists loaded from
   // the server.
   const [hasEverHadTodos, setHasEverHadTodos] = useState(false)
+
+  // Unread-error indicator state (Story 1.10). `acknowledgedIds` are the failed
+  // ids the user has acknowledged by FOCUSING the indicator — acknowledging
+  // clears the unread *notification* without dismissing the errors (the failed
+  // rows stay visible and actionable, AC 3). `indicatorFocused` keeps the
+  // indicator mounted while focused so Enter/click still fires the instant after
+  // focus marked everything read. Both are client-only presentation state — never
+  // a field on the Todo contract (1.7/1.8 precedent).
+  const [acknowledgedIds, setAcknowledgedIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  )
+  const [indicatorFocused, setIndicatorFocused] = useState(false)
+  // Queried for the first failed row's Retry (via [data-failed-retry]) when the
+  // indicator is activated — failed rows are pinned at the top, so document order
+  // makes the first match the first failed row (AC 2).
+  const surfaceRef = useRef<HTMLDivElement>(null)
 
   const {
     submit,
@@ -138,8 +161,9 @@ function App() {
     () => new Set(data?.map((todo) => todo.id) ?? []),
     [data],
   )
-  const visibleFailedCreates = failedCreates.filter(
-    (todo) => !serverIds.has(todo.id),
+  const visibleFailedCreates = useMemo(
+    () => failedCreates.filter((todo) => !serverIds.has(todo.id)),
+    [failedCreates, serverIds],
   )
 
   useEffect(() => {
@@ -150,6 +174,57 @@ function App() {
       clearFailedCreates(reconciledFailedIds)
     }
   }, [clearFailedCreates, failedCreates, serverIds])
+
+  // Prune acknowledged ids that are no longer failing (resolved or dismissed) so
+  // the set cannot grow unbounded AND a resolved-then-new failure with a fresh id
+  // is correctly unread again (AC 3). Guarded so it only set-states when the
+  // intersection actually differs — avoids render loops (mirrors the reconcile
+  // effect above).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reconciling client-only unread state against async query-derived failures, not synchronously derivable; guarded to set-state only when the intersection differs.
+    setAcknowledgedIds((prev) => {
+      if (prev.size === 0) return prev
+      const failedIdSet = new Set(visibleFailedCreates.map((todo) => todo.id))
+      const stale = [...prev].some((id) => !failedIdSet.has(id))
+      if (!stale) return prev
+      return new Set([...prev].filter((id) => failedIdSet.has(id)))
+    })
+  }, [visibleFailedCreates])
+
+  // The displayed N is the TOTAL failures above (never 0 while shown, climbs as
+  // failures accumulate). `unreadCount` (failures the user has not acknowledged)
+  // drives visibility together with `indicatorFocused`.
+  const failedCount = visibleFailedCreates.length
+  const unreadCount = visibleFailedCreates.filter(
+    (todo) => !acknowledgedIds.has(todo.id),
+  ).length
+  const showIndicator =
+    !isError && failedCount > 0 && (unreadCount > 0 || indicatorFocused)
+
+  // Focusing the indicator acknowledges the current failures (unread → 0) without
+  // dismissing them, and keeps it mounted while focused (AC 3).
+  function handleIndicatorFocus() {
+    setIndicatorFocused(true)
+    setAcknowledgedIds((prev) => {
+      const next = new Set(prev)
+      for (const todo of visibleFailedCreates) next.add(todo.id)
+      return next
+    })
+  }
+
+  function handleIndicatorBlur() {
+    setIndicatorFocused(false)
+  }
+
+  // Scroll the first failed row's Retry into view and focus it (AC 2). Null-safe:
+  // if the last failure resolved between render and activation, do nothing.
+  function activateFirstFailed() {
+    const retry = surfaceRef.current?.querySelector<HTMLElement>(
+      '[data-failed-retry]',
+    )
+    retry?.scrollIntoView({ block: 'nearest' })
+    retry?.focus()
+  }
 
   // Failed creates are pinned ABOVE the server list (where new creates prepend).
   // They live in the hook's client state, NOT the ['todos'] cache, so a sibling
@@ -185,8 +260,25 @@ function App() {
               <p className={styles.instruction}>{INSTRUCTION_LINE}</p>
             </div>
 
-            {/* Capture is sacred: the FIRST interactive element (AC 1). */}
-            <CaptureInput onSubmit={submit} />
+            {/*
+             * Capture is sacred: the FIRST interactive element (AC 1). The
+             * indicator is its right-hand sibling in a flex row, so the input
+             * stays first in DOM order (first-interactive invariant) and the
+             * indicator is the SECOND tab stop (Story 1.10 AC 1, 2). The
+             * indicator is rendered, never auto-focused, so it does not steal
+             * focus during burst capture.
+             */}
+            <div className={styles['capture-row']}>
+              <CaptureInput onSubmit={submit} />
+              {showIndicator && (
+                <UnreadErrorIndicator
+                  count={failedCount}
+                  onActivate={activateFirstFailed}
+                  onBlur={handleIndicatorBlur}
+                  onFocus={handleIndicatorFocus}
+                />
+              )}
+            </div>
           </>
         )}
 
@@ -202,7 +294,12 @@ function App() {
           </p>
         )}
 
-        {renderSurface()}
+        {/*
+         * The surface is wrapped so the indicator's activate handler can query
+         * the first failed row's Retry ([data-failed-retry]) without threading a
+         * ref through TodoList → TodoItem (Story 1.10 AC 2).
+         */}
+        <div ref={surfaceRef}>{renderSurface()}</div>
       </div>
     </main>
   )

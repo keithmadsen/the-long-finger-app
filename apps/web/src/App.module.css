@@ -60,6 +60,24 @@
 }
 
 /*
+ * Capture row (Story 1.10). The capture input grows to fill the row; the
+ * unread-error indicator sits to its right. align-items: flex-start aligns the
+ * indicator with the input's top line (the char-counter can sit beneath the
+ * input, so the row is not stretched). The input stays first in DOM order — the
+ * indicator is a visual sibling only (first-interactive invariant).
+ */
+.capture-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.capture-row > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/*
  * Accessible-clip pattern (Story 1.9): visually hidden but kept in the a11y tree
  * so aria-describedby can resolve it — NOT display:none / aria-hidden, which would
  * silence the reference. Mirrors the LiveRegion/Checkbox clip idiom; there is no
