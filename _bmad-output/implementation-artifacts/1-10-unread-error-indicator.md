@@ -4,7 +4,7 @@ baseline_commit: 53e5f329c6a52c1e129641dc2c048eeb24158391
 
 # Story 1.10: Unread-error indicator
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -28,8 +28,8 @@ so that I'm alerted to failures without my typing being interrupted or focus bei
 
 ## Tasks / Subtasks
 
-- [ ] **Frontend: `<UnreadErrorIndicator>` recipe** (AC 1, 2, 4) — new files `apps/web/src/components/recipes/UnreadErrorIndicator.tsx` + `UnreadErrorIndicator.module.css`
-  - [ ] A presentational recipe wrapping the existing `<Button>` primitive (REUSE it — it owns the `:focus-visible` ring, forced-colors border, `type="button"`; do NOT build a new focusable element). Props:
+- [x] **Frontend: `<UnreadErrorIndicator>` recipe** (AC 1, 2, 4) — new files `apps/web/src/components/recipes/UnreadErrorIndicator.tsx` + `UnreadErrorIndicator.module.css`
+  - [x] A presentational recipe wrapping the existing `<Button>` primitive (REUSE it — it owns the `:focus-visible` ring, forced-colors border, `type="button"`; do NOT build a new focusable element). Props:
     ```ts
     export interface UnreadErrorIndicatorProps {
       /** Number of failed-create rows above the list (the visible count). Caller renders this component only when it should be visible; if count <= 0 the component renders null defensively. */
@@ -42,42 +42,42 @@ so that I'm alerted to failures without my typing being interrupted or focus bei
       onBlur?: () => void
     }
     ```
-  - [ ] Visible label text: `count === 1 ? '1 error above' : \`${count} errors above\``. Set the full accessible name via `aria-label` = `${visibleText}. Press Enter to view the first failed task.` (AC 4). Define both as module-level helpers/constants so the test can assert exact strings. Use the existing copy style (no curly punctuation needed here — plain ASCII, matching `EmptyState`/`CharCounter` plain strings; the curly-quote rule in 1.9 applied to quoted task descriptions, not to this label).
-  - [ ] Wire `<Button onClick={onActivate} onFocus={onFocus} onBlur={onBlur} className={styles.indicator} aria-label={accessibleName}>{visibleText}</Button>`. `onClick` covers Enter, Space and mouse via native button semantics — do **not** add a custom `onKeyDown` (the spec says "press Enter"; native button activation already includes it and Space). The button is NOT pending/disabled, so the `<Button>` click-guard never blocks it.
-  - [ ] If `count <= 0` return `null` (defensive; App also gates rendering — see App task).
+  - [x] Visible label text: `count === 1 ? '1 error above' : \`${count} errors above\``. Set the full accessible name via `aria-label` = `${visibleText}. Press Enter to view the first failed task.` (AC 4). Define both as module-level helpers/constants so the test can assert exact strings. Use the existing copy style (no curly punctuation needed here — plain ASCII, matching `EmptyState`/`CharCounter` plain strings; the curly-quote rule in 1.9 applied to quoted task descriptions, not to this label).
+  - [x] Wire `<Button onClick={onActivate} onFocus={onFocus} onBlur={onBlur} className={styles.indicator} aria-label={accessibleName}>{visibleText}</Button>`. `onClick` covers Enter, Space and mouse via native button semantics — do **not** add a custom `onKeyDown` (the spec says "press Enter"; native button activation already includes it and Space). The button is NOT pending/disabled, so the `<Button>` click-guard never blocks it.
+  - [x] If `count <= 0` return `null` (defensive; App also gates rendering — see App task).
 
-- [ ] **Frontend: `<UnreadErrorIndicator>` styles** (AC 1)
-  - [ ] In `UnreadErrorIndicator.module.css`, style `.indicator`: `color: var(--color-error)`, `font-size: var(--font-size-secondary)`, `font-weight: var(--font-weight-medium)`. The shared `<Button>` already provides padding/hit-area/focus-ring/forced-colors border; this class only adds the error-text typography (override the Button's default text color/size). Keep it a text affordance (no background/border of its own beyond what `<Button>` supplies); align with the input's first line (`align-self: flex-start` if the parent row is `align-items` stretched). Under `forced-colors: active` the `--color-error` is overridden by the system — that is acceptable because the label TEXT ("N errors above") carries the meaning (mirror the 1.9 / UX-DR26 "label change, not color" discipline). Do NOT introduce literal colors or off-scale px (token-name lint, Story 1.3).
+- [x] **Frontend: `<UnreadErrorIndicator>` styles** (AC 1)
+  - [x] In `UnreadErrorIndicator.module.css`, style `.indicator`: `color: var(--color-error)`, `font-size: var(--font-size-secondary)`, `font-weight: var(--font-weight-medium)`. The shared `<Button>` already provides padding/hit-area/focus-ring/forced-colors border; this class only adds the error-text typography (override the Button's default text color/size). Keep it a text affordance (no background/border of its own beyond what `<Button>` supplies); align with the input's first line (`align-self: flex-start` if the parent row is `align-items` stretched). Under `forced-colors: active` the `--color-error` is overridden by the system — that is acceptable because the label TEXT ("N errors above") carries the meaning (mirror the 1.9 / UX-DR26 "label change, not color" discipline). Do NOT introduce literal colors or off-scale px (token-name lint, Story 1.3).
 
-- [ ] **Frontend: compose the indicator beside the input + own the unread/visibility state in `App.tsx`** (AC 1, 2, 3) — the central wiring of this story
-  - [ ] Import `UnreadErrorIndicator`. Render it **immediately after `<CaptureInput>`**, both wrapped in a new flex-row container (`styles.captureRow`) so the indicator sits to the right of the input while the input stays first in DOM order (AC 1 / first-interactive invariant). The instruction line stays ABOVE this row, unchanged.
-  - [ ] **Unread state (AC 3).** Add:
+- [x] **Frontend: compose the indicator beside the input + own the unread/visibility state in `App.tsx`** (AC 1, 2, 3) — the central wiring of this story
+  - [x] Import `UnreadErrorIndicator`. Render it **immediately after `<CaptureInput>`**, both wrapped in a new flex-row container (`styles.captureRow`) so the indicator sits to the right of the input while the input stays first in DOM order (AC 1 / first-interactive invariant). The instruction line stays ABOVE this row, unchanged.
+  - [x] **Unread state (AC 3).** Add:
     - `const [acknowledgedIds, setAcknowledgedIds] = useState<ReadonlySet<string>>(() => new Set())` — failed ids the user has acknowledged by focusing the indicator.
     - `const [indicatorFocused, setIndicatorFocused] = useState(false)` — keeps the indicator mounted while focused so Enter/click can fire even right after focus marked everything read.
     - `const unreadCount = visibleFailedCreates.filter((t) => !acknowledgedIds.has(t.id)).length`
     - `const failedCount = visibleFailedCreates.length` (the displayed N — total failures above, never 0 while shown).
     - `const showIndicator = failedCount > 0 && (unreadCount > 0 || indicatorFocused)`.
-  - [ ] **Prune acknowledged ids that are no longer failing** (so the set can't grow unbounded and a *resolved-then-new* failure with a fresh id is correctly unread): an effect keyed on `visibleFailedCreates` that, when `acknowledgedIds` contains ids absent from `visibleFailedCreates`, sets the set to its intersection with current failed ids. Guard the set-state so it only runs when the intersection actually differs (avoid render loops) — mirror the `clearFailedCreates` reconcile effect already in App.
-  - [ ] **Handlers:**
+  - [x] **Prune acknowledged ids that are no longer failing** (so the set can't grow unbounded and a *resolved-then-new* failure with a fresh id is correctly unread): an effect keyed on `visibleFailedCreates` that, when `acknowledgedIds` contains ids absent from `visibleFailedCreates`, sets the set to its intersection with current failed ids. Guard the set-state so it only runs when the intersection actually differs (avoid render loops) — mirror the `clearFailedCreates` reconcile effect already in App.
+  - [x] **Handlers:**
     - `onFocus` → `setIndicatorFocused(true)` AND mark current failures read: `setAcknowledgedIds((prev) => new Set([...prev, ...visibleFailedCreates.map((t) => t.id)]))`.
     - `onBlur` → `setIndicatorFocused(false)`.
     - `onActivate` → find the first failed row's Retry button and `scrollIntoView` + `focus` it (next task).
-  - [ ] Render: `{showIndicator && <UnreadErrorIndicator count={failedCount} onActivate={activateFirstFailed} onFocus={...} onBlur={...} />}`.
-  - [ ] **Do NOT auto-focus the indicator** when it appears (AC 1 — focus must stay in the input during burst capture).
+  - [x] Render: `{showIndicator && <UnreadErrorIndicator count={failedCount} onActivate={activateFirstFailed} onFocus={...} onBlur={...} />}`.
+  - [x] **Do NOT auto-focus the indicator** when it appears (AC 1 — focus must stay in the input during burst capture).
 
-- [ ] **Frontend: scroll-to + focus the first failed row's Retry** (AC 2)
-  - [ ] Mark the Retry `<Button>` in the **Failed** branch of `TodoItem.tsx` with a stable, queryable attribute so App can find it without depending on hashed CSS-module class names: add `data-failed-retry` to the Retry `<Button>` (the `<Button>` primitive spreads unknown props onto the native `<button>` via `{...props}`, so `data-failed-retry` lands on the DOM node — verify by reading `Button.tsx`). Do NOT change anything else in the Failed branch (1.9 contract).
-  - [ ] In `App.tsx`, add a ref on the surface container that holds the list (e.g. wrap `renderSurface()` so the `<TodoList>` area has a stable parent, or put a `ref` on a wrapping element). `activateFirstFailed()` = `const el = surfaceRef.current?.querySelector<HTMLElement>('[data-failed-retry]'); el?.scrollIntoView({ block: 'nearest' }); el?.focus()`. Because failed rows are **pinned at the top** of `rows` (1.9), `querySelector` (document order) returns the **first** failed row's Retry — exactly the target. No need to mark "only the first"; the first match is correct.
-  - [ ] Keep it null-safe: if there is no failed Retry in the DOM (race where the last failure resolved between render and activation), do nothing (no throw).
+- [x] **Frontend: scroll-to + focus the first failed row's Retry** (AC 2)
+  - [x] Mark the Retry `<Button>` in the **Failed** branch of `TodoItem.tsx` with a stable, queryable attribute so App can find it without depending on hashed CSS-module class names: add `data-failed-retry` to the Retry `<Button>` (the `<Button>` primitive spreads unknown props onto the native `<button>` via `{...props}`, so `data-failed-retry` lands on the DOM node — verify by reading `Button.tsx`). Do NOT change anything else in the Failed branch (1.9 contract).
+  - [x] In `App.tsx`, add a ref on the surface container that holds the list (e.g. wrap `renderSurface()` so the `<TodoList>` area has a stable parent, or put a `ref` on a wrapping element). `activateFirstFailed()` = `const el = surfaceRef.current?.querySelector<HTMLElement>('[data-failed-retry]'); el?.scrollIntoView({ block: 'nearest' }); el?.focus()`. Because failed rows are **pinned at the top** of `rows` (1.9), `querySelector` (document order) returns the **first** failed row's Retry — exactly the target. No need to mark "only the first"; the first match is correct.
+  - [x] Keep it null-safe: if there is no failed Retry in the DOM (race where the last failure resolved between render and activation), do nothing (no throw).
 
-- [ ] **Frontend tests** (AC 1–5)
-  - [ ] `apps/web/src/components/recipes/UnreadErrorIndicator.test.tsx` (new): renders `"1 error above"` for `count={1}` and `"3 errors above"` for `count={3}`; accessible name is `"3 errors above. Press Enter to view the first failed task."` (assert via `getByRole('button', { name: ... })`); `onActivate` fires on click and on `{Enter}`/`{ }` keydown (use `userEvent`); `onFocus`/`onBlur` fire; `count={0}` renders null.
-  - [ ] `apps/web/src/App.test.tsx` (extend): (a) after a create fails, the indicator appears with `"1 error above"` and **focus is still on the capture input** (assert `document.activeElement` is the input — it did not steal focus); (b) `userEvent.tab()` from the input moves focus to the indicator (it is the next tab stop after the input); (c) pressing `{Enter}` on the focused indicator calls `scrollIntoView` (spy) and moves focus to the failed row's Retry button (`data-failed-retry`); (d) **focus-acknowledge**: focusing the indicator then blurring it hides the indicator while the failed row is still present (AC 3); (e) resolving the only failure (Retry → success, or Dismiss) hides the indicator (AC 3); (f) a **second, later** failure after acknowledging the first re-shows the indicator with the new count (unread re-arms). Stub `Element.prototype.scrollIntoView` with `vi.fn()` in this file (jsdom does not implement it — calling it unstubbed throws); restore in cleanup.
-  - [ ] Keep `App.firstInteractive.test.tsx` green and **add a case**: with a failed row present (indicator visible), the capture input is STILL the first interactive element and the indicator is the second (AC 1). The existing `INTERACTIVE_SELECTOR` already captures `button` — extend a test to assert order `[input, indicator-button, ...retry/dismiss]`.
-  - [ ] `App.axe.test.tsx`: keep green with the indicator present (a focusable button with a clear accessible name and token-driven error color — should pass; verify contrast of `--color-error` text on `--color-surface` is already covered by `contrast:check`).
+- [x] **Frontend tests** (AC 1–5)
+  - [x] `apps/web/src/components/recipes/UnreadErrorIndicator.test.tsx` (new): renders `"1 error above"` for `count={1}` and `"3 errors above"` for `count={3}`; accessible name is `"3 errors above. Press Enter to view the first failed task."` (assert via `getByRole('button', { name: ... })`); `onActivate` fires on click and on `{Enter}`/`{ }` keydown (use `userEvent`); `onFocus`/`onBlur` fire; `count={0}` renders null.
+  - [x] `apps/web/src/App.test.tsx` (extend): (a) after a create fails, the indicator appears with `"1 error above"` and **focus is still on the capture input** (assert `document.activeElement` is the input — it did not steal focus); (b) `userEvent.tab()` from the input moves focus to the indicator (it is the next tab stop after the input); (c) pressing `{Enter}` on the focused indicator calls `scrollIntoView` (spy) and moves focus to the failed row's Retry button (`data-failed-retry`); (d) **focus-acknowledge**: focusing the indicator then blurring it hides the indicator while the failed row is still present (AC 3); (e) resolving the only failure (Retry → success, or Dismiss) hides the indicator (AC 3); (f) a **second, later** failure after acknowledging the first re-shows the indicator with the new count (unread re-arms). Stub `Element.prototype.scrollIntoView` with `vi.fn()` in this file (jsdom does not implement it — calling it unstubbed throws); restore in cleanup.
+  - [x] Keep `App.firstInteractive.test.tsx` green and **add a case**: with a failed row present (indicator visible), the capture input is STILL the first interactive element and the indicator is the second (AC 1). The existing `INTERACTIVE_SELECTOR` already captures `button` — extend a test to assert order `[input, indicator-button, ...retry/dismiss]`.
+  - [x] `App.axe.test.tsx`: keep green with the indicator present (a focusable button with a clear accessible name and token-driven error color — should pass; verify contrast of `--color-error` text on `--color-surface` is already covered by `contrast:check`).
 
-- [ ] **Gates** (all ACs)
-  - [ ] Under **Node 24** (`nvm use 24` — the api native binding requires it; this story is frontend-only but run the full workspace suite): `npm run typecheck`, `npm test`, `npm run lint --workspace apps/web`, `npm run lint:css --workspace apps/web`, `npm run contrast:check --workspace apps/web`, then `npm run build --workspace apps/web` and `npm run size:check --workspace apps/web`. This story adds a small recipe + a little App state — **no new dependency**. Rebaseline `size:check` with `-- --update` ONLY if the genuine additions exceed the 512 B tolerance, and call it out in the Completion Notes (a deliberate, reviewed bump — same as 1.9's `f4b5d4b`).
+- [x] **Gates** (all ACs)
+  - [x] Under **Node 24** (`nvm use 24` — the api native binding requires it; this story is frontend-only but run the full workspace suite): `npm run typecheck`, `npm test`, `npm run lint --workspace apps/web`, `npm run lint:css --workspace apps/web`, `npm run contrast:check --workspace apps/web`, then `npm run build --workspace apps/web` and `npm run size:check --workspace apps/web`. This story adds a small recipe + a little App state — **no new dependency**. Rebaseline `size:check` with `-- --update` ONLY if the genuine additions exceed the 512 B tolerance, and call it out in the Completion Notes (a deliberate, reviewed bump — same as 1.9's `f4b5d4b`).
 
 ## Dev Notes
 
@@ -158,14 +158,82 @@ There is **no** `recipes/index.ts` barrel — recipes are imported by direct pat
 
 ### Agent Model Used
 
+claude-opus-4-8[1m] (Opus 4.8, 1M context)
+
 ### Debug Log References
+
+None — no HALT conditions hit. The only deviation from the literal task text was
+required by the project's lint rules (caught by `npm run lint`/`lint:css`, fixed
+before completion):
+
+- The recipe's `visibleText`/`accessibleName` helpers are **module-level but NOT
+  exported** (`react-refresh/only-export-components` forbids non-component exports
+  from a component file). The tests assert the literal strings directly, so the
+  helpers did not need to be exported to be testable.
+- The flex wrapper class is `.capture-row` (kebab-case) referenced as
+  `styles['capture-row']`, not `.captureRow` (`selector-class-pattern` enforces
+  kebab-case, matching `.instruction-wrap`/`.visually-hidden`).
+- The prune effect carries an `eslint-disable-next-line
+  react-hooks/set-state-in-effect` with justification, mirroring the existing
+  `hasEverHadTodos` session-latch effect.
 
 ### Completion Notes List
 
+- **`<UnreadErrorIndicator>` recipe** (new) wraps the shared `<Button>` primitive
+  (reused for the focus-visible ring, forced-colors border, `type="button"`).
+  `count` → visible `"N error(s) above"` + `aria-label` `"N error(s) above. Press
+  Enter to view the first failed task."` (visible text contained in the
+  accessible name → WCAG 2.5.3). `onClick` covers Enter/Space/mouse via native
+  button semantics (no custom `onKeyDown`). Returns `null` when `count <= 0`.
+- **Unread model in `App.tsx`**: `acknowledgedIds` (failed ids the user focused →
+  acknowledged) + `indicatorFocused` (keeps it mounted while focused).
+  `failedCount` = total failures above (the displayed N, never 0 while shown);
+  `unreadCount` = unacknowledged failures; `showIndicator = failedCount > 0 &&
+  (unreadCount > 0 || indicatorFocused)`. Focusing the indicator acknowledges the
+  current failures (unread → 0) **without dismissing** the failed rows (AC 3); a
+  later failure with a fresh id re-arms unread. A guarded prune effect intersects
+  `acknowledgedIds` with current failures so the set can't grow unbounded and a
+  resolved-then-new failure is correctly unread.
+- **First-interactive invariant preserved**: indicator is the capture input's
+  right-hand sibling in a new `.capture-row` flex wrapper — input stays first in
+  DOM order, indicator is the second tab stop. Never auto-focused (AC 1).
+- **Activate → first failed Retry**: marked the Failed-branch Retry `<Button>`
+  with `data-failed-retry`; App keeps a `surfaceRef` on the surface wrapper and on
+  activate does `querySelector('[data-failed-retry]')` → `scrollIntoView({ block:
+  'nearest' })` + `focus()`. Failed rows are pinned at the top, so document order
+  makes the first match the first failed row. Null-safe if the last failure
+  resolved between render and activation.
+- **Resolved the source tension** (Dev Notes "Open question for Keith") in favour
+  of the acknowledged-id model: focus clears the *unread notification* only; the
+  failed rows stay fully intact and actionable. If you instead want the indicator
+  to stay visible while ANY failed row exists, it's the one-line
+  `showIndicator = failedCount > 0` change — flagging for your review.
+- **Bundle size — deliberate, reviewed rebaseline**: the new recipe + App state +
+  CSS grew the gzipped bundle from 76146 B to **76983 B** (+837 B, over the 512 B
+  tolerance by 325 B). Rebaselined `bundle-size-baseline.json` with
+  `size:check -- --update` (same discipline as Story 1.9's `f4b5d4b`). No new
+  dependency was added.
+- **Gates (all green under Node 24)**: `typecheck`, full `test` (api 38 + web
+  130), `lint`, `lint:css`, `contrast:check` (`--color-error` on `--color-surface`
+  = 6.91:1 AA), `build`, `size:check`. `App.firstInteractive.test.tsx` and
+  `App.axe.test.tsx` stay green with the indicator present; the Story 1.9
+  Failed/Retry/Dismiss/`beforeunload` behavior is unchanged.
+
 ### File List
+
+- `apps/web/src/components/recipes/UnreadErrorIndicator.tsx` — NEW
+- `apps/web/src/components/recipes/UnreadErrorIndicator.module.css` — NEW
+- `apps/web/src/components/recipes/UnreadErrorIndicator.test.tsx` — NEW
+- `apps/web/src/App.tsx` — MODIFIED (import + `.capture-row` wrapper + indicator render; `acknowledgedIds`/`indicatorFocused`/`surfaceRef`; `failedCount`/`unreadCount`/`showIndicator`; prune effect; `handleIndicatorFocus`/`handleIndicatorBlur`/`activateFirstFailed`; memoized `visibleFailedCreates`; header comment updated)
+- `apps/web/src/App.module.css` — MODIFIED (added `.capture-row`)
+- `apps/web/src/components/recipes/TodoItem.tsx` — MODIFIED (added `data-failed-retry` to the Failed-branch Retry `<Button>`)
+- `apps/web/src/App.test.tsx` — MODIFIED (added "App unread-error indicator (Story 1.10)" describe block: scenarios a–f + scrollIntoView stub)
+- `apps/web/src/App.firstInteractive.test.tsx` — MODIFIED (added indicator-order case + userEvent import)
+- `apps/web/bundle-size-baseline.json` — MODIFIED (rebaselined to 76983 B gz)
 
 ## Change Log
 
 | Date       | Change                                                                                                                                                                                                                       |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-06-30 | Story 1.10 created — `<UnreadErrorIndicator>` recipe (focusable "N error(s) above" right of the input), App-owned unread/acknowledged + focus-visibility state, Enter→scroll+focus first failed Retry. Status → ready-for-dev. |
+| 2026-06-30 | Story 1.10 implemented — new `<UnreadErrorIndicator>` recipe + styles; App `acknowledgedIds`/`indicatorFocused`/`surfaceRef` state, prune effect, focus-acknowledge + `activateFirstFailed` handlers, `.capture-row` wrapper; `data-failed-retry` on the Failed Retry button. Tests added (recipe + App a–f + first-interactive order). Bundle-size baseline rebaselined 76146→76983 B gz (reviewed, no new dep). All gates green under Node 24. Status → review. |

@@ -77,6 +77,8 @@ project: the long finger
 # 2026-06-28: 1-9 → in-progress (dev-story)
 # 2026-06-28: 1-9 → review (dev-story complete)
 # 2026-06-30: 1-10 → ready-for-dev (create-story)
+# 2026-06-30: 1-10 → in-progress (dev-story)
+# 2026-06-30: 1-10 → review (dev-story complete)
 project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"
@@ -93,7 +95,7 @@ development_status:
   1-7-capture-and-confirm-add-a-task: done
   1-8-complete-uncomplete-a-task: done
   1-9-failed-create-recovery: done
-  1-10-unread-error-indicator: ready-for-dev
+  1-10-unread-error-indicator: review
   1-11-thin-container-deploy: backlog
   epic-1-retrospective: optional
 
