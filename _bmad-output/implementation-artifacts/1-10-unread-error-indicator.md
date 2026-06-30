@@ -4,7 +4,7 @@ baseline_commit: 53e5f329c6a52c1e129641dc2c048eeb24158391
 
 # Story 1.10: Unread-error indicator
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -78,6 +78,11 @@ so that I'm alerted to failures without my typing being interrupted or focus bei
 
 - [x] **Gates** (all ACs)
   - [x] Under **Node 24** (`nvm use 24` — the api native binding requires it; this story is frontend-only but run the full workspace suite): `npm run typecheck`, `npm test`, `npm run lint --workspace apps/web`, `npm run lint:css --workspace apps/web`, `npm run contrast:check --workspace apps/web`, then `npm run build --workspace apps/web` and `npm run size:check --workspace apps/web`. This story adds a small recipe + a little App state — **no new dependency**. Rebaseline `size:check` with `-- --update` ONLY if the genuine additions exceed the 512 B tolerance, and call it out in the Completion Notes (a deliberate, reviewed bump — same as 1.9's `f4b5d4b`).
+
+### Review Findings
+
+- [x] [Review][Patch] Indicator can render with no failed Retry target [apps/web/src/App.tsx:201]
+- [x] [Review][Patch] Test teardown deletes any existing `scrollIntoView` implementation [apps/web/src/App.test.tsx:592]
 
 ## Dev Notes
 
@@ -218,6 +223,10 @@ before completion):
   = 6.91:1 AA), `build`, `size:check`. `App.firstInteractive.test.tsx` and
   `App.axe.test.tsx` stay green with the indicator present; the Story 1.9
   Failed/Retry/Dismiss/`beforeunload` behavior is unchanged.
+- **Code review fixes applied**: indicator now hides while the list surface is in
+  load-failed state so it never activates without a mounted failed Retry target;
+  `App.test.tsx` now restores any pre-existing `scrollIntoView` descriptor after
+  stubbing it. Regression coverage added for the failed-surface case.
 
 ### File List
 
@@ -237,3 +246,4 @@ before completion):
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-06-30 | Story 1.10 created — `<UnreadErrorIndicator>` recipe (focusable "N error(s) above" right of the input), App-owned unread/acknowledged + focus-visibility state, Enter→scroll+focus first failed Retry. Status → ready-for-dev. |
 | 2026-06-30 | Story 1.10 implemented — new `<UnreadErrorIndicator>` recipe + styles; App `acknowledgedIds`/`indicatorFocused`/`surfaceRef` state, prune effect, focus-acknowledge + `activateFirstFailed` handlers, `.capture-row` wrapper; `data-failed-retry` on the Failed Retry button. Tests added (recipe + App a–f + first-interactive order). Bundle-size baseline rebaselined 76146→76983 B gz (reviewed, no new dep). All gates green under Node 24. Status → review. |
+| 2026-06-30 | Code review fixes applied — hid indicator during load-failed surface when no failed Retry is mounted, restored `scrollIntoView` test stub correctly, added regression coverage. Status → done. |

@@ -199,7 +199,7 @@ function App() {
     (todo) => !acknowledgedIds.has(todo.id),
   ).length
   const showIndicator =
-    failedCount > 0 && (unreadCount > 0 || indicatorFocused)
+    !isError && failedCount > 0 && (unreadCount > 0 || indicatorFocused)
 
   // Focusing the indicator acknowledges the current failures (unread → 0) without
   // dismissing them, and keeps it mounted while focused (AC 3).

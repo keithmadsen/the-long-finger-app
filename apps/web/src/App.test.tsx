@@ -588,6 +588,10 @@ describe('App unread-error indicator (Story 1.10)', () => {
   // The indicator's accessible name carries the count + the Enter hint (AC 4).
   const indicatorName = (count: number) =>
     `${count === 1 ? '1 error' : `${count} errors`} above. Press Enter to view the first failed task.`
+  const originalScrollIntoView = Object.getOwnPropertyDescriptor(
+    Element.prototype,
+    'scrollIntoView',
+  )
 
   beforeEach(() => {
     document.title = ''
@@ -597,8 +601,17 @@ describe('App unread-error indicator (Story 1.10)', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
-    // Restore the jsdom stub so other suites are unaffected.
-    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView
+    // Restore the previous descriptor so future jsdom/setup implementations are
+    // not deleted by this suite.
+    if (originalScrollIntoView) {
+      Object.defineProperty(
+        Element.prototype,
+        'scrollIntoView',
+        originalScrollIntoView,
+      )
+    } else {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView
+    }
   })
 
   // GET returns the (empty) server list; POST always 500s so every create fails.
@@ -715,6 +728,34 @@ describe('App unread-error indicator (Story 1.10)', () => {
         screen.queryByRole('button', { name: indicatorName(1) }),
       ).not.toBeInTheDocument(),
     )
+  })
+
+  it('hides while the list surface is failed so activation never points at a missing failed Retry', async () => {
+    let failGets = false
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (!init || init.method === undefined || init.method === 'GET') {
+        return failGets ? new Response('', { status: 500 }) : okResponse([])
+      }
+      return new Response('', { status: 500 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { client } = renderWithClient(<App />)
+
+    await screen.findByText('Your list will appear here.')
+    await failOneCreate('hidden while list failed')
+    expect(
+      await screen.findByRole('button', { name: indicatorName(1) }),
+    ).toBeInTheDocument()
+
+    failGets = true
+    await client.invalidateQueries({ queryKey: ['todos'] })
+
+    expect(
+      await screen.findByText('Couldn’t load your list. Refresh to try again.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: indicatorName(1) }),
+    ).not.toBeInTheDocument()
   })
 
   it('re-arms unread: a later failure after acknowledging the first re-shows the indicator with the new count (AC 3)', async () => {
