@@ -41,6 +41,12 @@ describe('TodoList', () => {
     expect(rendered).toEqual(['render me first', 'render me second'])
   })
 
+  it('does not render delete affordances without a delete handler', () => {
+    render(<TodoList todos={TODOS} />)
+
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+  })
+
   describe('armed-delete coordination (Story 2.2)', () => {
     afterEach(() => {
       vi.useRealTimers()
@@ -110,6 +116,19 @@ describe('TodoList', () => {
 
       // Tapping anywhere outside the armed affordance reverts it.
       await user.click(screen.getByRole('button', { name: 'outside' }))
+
+      expect(screen.queryByRole('button', { name: 'Confirm' })).toBeNull()
+      expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(2)
+    })
+
+    it('tabbing away from an armed affordance reverts it to idle (AC 5)', async () => {
+      const user = userEvent.setup()
+      render(<TodoList onDelete={vi.fn()} todos={TODOS} />)
+
+      await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!)
+      expect(screen.getByRole('button', { name: 'Confirm' })).toHaveFocus()
+
+      await user.tab()
 
       expect(screen.queryByRole('button', { name: 'Confirm' })).toBeNull()
       expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(2)

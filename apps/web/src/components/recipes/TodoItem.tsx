@@ -201,16 +201,17 @@ export function TodoItem({
            *   • onKeyDown: stop — the label's handleKeyDown toggles on Enter for
            *     ANY target, so Enter on this button would BOTH delete and toggle
            *     without this stop. (Space is already gated by target===currentTarget.)
-           * data-armed-delete is the tap-away marker useArmedDelete checks so a
-           * pointerdown on this affordance does not self-revert. Blur reverts an
-           * armed row (Tab-away). The visible text IS the accessible name this
-           * story (Story 2.3 enriches it with aria-label + aria-pressed).
+           * data-armed-delete is present only on the currently armed affordance, so
+           * a pointerdown on another row's idle Delete is treated as tap-away before
+           * that row's click arms it. Blur reverts an armed row (Tab-away). The
+           * visible text IS the accessible name this story (Story 2.3 enriches it
+           * with aria-label + aria-pressed).
            */
           <Button
             className={[styles.delete, armed ? styles.armed : null]
               .filter(Boolean)
               .join(' ')}
-            data-armed-delete
+            data-armed-delete={armed ? true : undefined}
             onBlur={onDeleteCancel}
             onClick={(event) => {
               event.stopPropagation()

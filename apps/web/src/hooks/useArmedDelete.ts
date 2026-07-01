@@ -117,8 +117,13 @@ export function useArmedDelete({
   useEffect(() => {
     if (armedId === null) return
     function handlePointerDown(event: PointerEvent) {
-      const target = event.target as Element | null
-      if (target?.closest('[data-armed-delete]')) return
+      const target = event.target
+      if (
+        target instanceof Element &&
+        target.closest('[data-armed-delete]')
+      ) {
+        return
+      }
       cancel()
     }
     document.addEventListener('pointerdown', handlePointerDown, true)

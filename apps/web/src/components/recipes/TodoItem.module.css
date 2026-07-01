@@ -156,6 +156,18 @@
   transition: color var(--motion-settle) var(--motion-ease);
 }
 
+/*
+ * Reserve the wider armed label's width while idle. Without this, Delete→Confirm
+ * can steal inline space from the clamped description and change row height.
+ */
+.delete::after {
+  display: block;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  content: "Confirm";
+}
+
 /* Armed: the affordance reads Confirm in the error colour (AC 2). */
 .armed {
   color: var(--color-error);

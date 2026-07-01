@@ -65,6 +65,7 @@ export function TodoList({
         // A failed row is rendered as the Failed variant and is NEVER also
         // treated as pending/toggling (it has no in-flight create or server item).
         const isFailed = failedIds?.has(todo.id) ?? false
+        const canDelete = !isFailed && onDelete !== undefined
         return (
           <TodoItem
             key={todo.id}
@@ -73,7 +74,7 @@ export function TodoList({
             describedById={describedById}
             failed={isFailed}
             onDeleteCancel={cancel}
-            onDeletePress={isFailed ? undefined : () => press(todo.id)}
+            onDeletePress={canDelete ? () => press(todo.id) : undefined}
             onDismiss={() => onDismiss?.(todo.id)}
             onRetry={() => onRetry?.(todo.id)}
             onToggle={(completed) => onToggle?.(todo.id, completed)}

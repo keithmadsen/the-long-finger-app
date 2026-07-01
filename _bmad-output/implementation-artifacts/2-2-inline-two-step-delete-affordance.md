@@ -4,7 +4,7 @@ baseline_commit: 1bb61a1e79fd019532825ca64680479009310234
 
 # Story 2.2: Inline two-step delete affordance
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -118,6 +118,15 @@ Deferring these is deliberate — building them now creates dead code and pre-em
 ### F. Verification
 
 - [x] **Task F1:** Run the full suite. **API tests require Node 24** (`nvm use 24` first — better-sqlite3 ABI; shell default is Node 22). This story is web-only, but run the whole gate: `npm test`, `npm run typecheck`, `npm run build`, `eslint`, and `stylelint` (the new CSS must pass the token/vendor-prefix lint rules already enforced in `TodoItem.module.css`). Note the bundle-size ratchet gate (`bundle-size-baseline.json`) — this story adds a hook + a button + CSS (no new deps), so the delta should be small; if the gate trips, confirm the increase is only the new component code and rebaseline per the established convention (Keith-approved rebaselines are the norm).
+
+### Review Findings
+
+- [x] [Review][Patch] TodoList renders Delete/Confirm even when no delete handler exists [apps/web/src/components/recipes/TodoList.tsx:75]
+- [x] [Review][Patch] Tap-away marker is applied to every delete button instead of only the armed affordance [apps/web/src/components/recipes/TodoItem.tsx:213]
+- [x] [Review][Patch] Tap-away handler assumes pointerdown targets always support `closest` [apps/web/src/hooks/useArmedDelete.ts:119]
+- [x] [Review][Patch] Delete -> Confirm does not reserve width for the wider armed label, so it can change row height [apps/web/src/components/recipes/TodoItem.module.css:145]
+- [x] [Review][Patch] Blur-to-revert cancel path is untested at the TodoList/TodoItem integration boundary [apps/web/src/components/recipes/TodoList.test.tsx:44]
+- [x] [Review][Patch] App delete wiring test waits on real wall-clock time for the 300 ms confirm window [apps/web/src/App.test.tsx:849]
 
 ## Dev Notes
 

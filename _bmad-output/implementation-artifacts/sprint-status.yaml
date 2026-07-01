@@ -118,7 +118,7 @@ development_status:
   # Epic 2: Safe Delete
   epic-2: in-progress
   2-1-delete-endpoint-mutation: done
-  2-2-inline-two-step-delete-affordance: review
+  2-2-inline-two-step-delete-affordance: done
   2-3-delete-accessibility-state-race-hardening: backlog
   epic-2-retrospective: optional
 

@@ -1,5 +1,5 @@
 import type { Todo } from '@tlf/contracts'
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -40,6 +40,7 @@ describe('App', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
   })
 
@@ -825,7 +826,6 @@ describe('App delete (Story 2.2)', () => {
   }
 
   it('wires delete: committing a row issues DELETE, marks it aria-busy, and the refetch drops it (AC 8)', async () => {
-    const user = userEvent.setup()
     const fetchMock = stubServer([
       todo({ id: 'a', description: 'delete me' }),
       todo({ id: 'b', description: 'keep me' }),
@@ -841,16 +841,16 @@ describe('App delete (Story 2.2)', () => {
 
     // Arm the 'delete me' row.
     const row = screen.getByText('delete me').closest('li')!
-    await user.click(within(row).getByRole('button', { name: 'Delete' }))
+    vi.useFakeTimers()
+    fireEvent.click(within(row).getByRole('button', { name: 'Delete' }))
     expect(
       within(row).getByRole('button', { name: 'Confirm' }),
     ).toBeInTheDocument()
 
-    // Cross the 300 ms muscle-memory window (real timers), then confirm.
-    await new Promise((resolve) =>
-      setTimeout(resolve, DELETE_NO_COMMIT_WINDOW_MS + 50),
-    )
-    await user.click(within(row).getByRole('button', { name: 'Confirm' }))
+    // Cross the 300 ms muscle-memory window deterministically, then confirm.
+    act(() => vi.advanceTimersByTime(DELETE_NO_COMMIT_WINDOW_MS))
+    fireEvent.click(within(row).getByRole('button', { name: 'Confirm' }))
+    vi.useRealTimers()
 
     // A DELETE was issued for row 'a'.
     await waitFor(() =>
