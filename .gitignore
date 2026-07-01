@@ -5,6 +5,9 @@ _bmad/
 .agents/
 .claude/
 
+# Playwright MCP scratch output (page snapshots from browser verification)
+.playwright-mcp/
+
 # Logs
 *.log
 
