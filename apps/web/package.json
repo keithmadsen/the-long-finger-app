@@ -16,7 +16,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@sinclair/typebox": "^0.34.49",
     "@tanstack/react-query": "^5.101.0",
+    "@tlf/contracts": "*",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "uuid": "^14.0.1"

@@ -1,5 +1,7 @@
 import type { CreateTodoBody, PatchTodoBody, Todo } from '@tlf/contracts'
 
+import { parseTodo, parseTodoArray } from './validateContract'
+
 /*
  * The ONLY place the network is touched for the read path (architecture.md
  * component boundary: just hooks/api reach the network; recipes/primitives never
@@ -7,7 +9,9 @@ import type { CreateTodoBody, PatchTodoBody, Todo } from '@tlf/contracts'
  * returns the parsed, typed Todo[].
  *
  * Throws on a non-OK response so TanStack Query enters isError and <App> shows
- * the load-failed surface (AC 6). The backend is the canonical-order authority
+ * the load-failed surface (AC 6). The 2xx body is validated at runtime against
+ * the shared @tlf/contracts schema (Story 2.1 AC 6) — a malformed body throws
+ * and routes to isError too. The backend is the canonical-order authority
  * (completed ASC, updated_at DESC) — we return its array verbatim and NEVER
  * re-sort (AC 8).
  */
@@ -18,22 +22,7 @@ export async function getTodos(): Promise<Todo[]> {
     throw new Error(`GET /todos failed: ${response.status}`)
   }
 
-  return (await response.json()) as Todo[]
-}
-
-function isTodo(value: unknown): value is Todo {
-  if (typeof value !== 'object' || value === null) {
-    return false
-  }
-
-  const candidate = value as Record<string, unknown>
-  return (
-    typeof candidate.id === 'string' &&
-    typeof candidate.description === 'string' &&
-    typeof candidate.completed === 'boolean' &&
-    typeof candidate.createdAt === 'string' &&
-    typeof candidate.updatedAt === 'string'
-  )
+  return parseTodoArray(await response.json())
 }
 
 /*
@@ -43,9 +32,10 @@ function isTodo(value: unknown): value is Todo {
  * owns the final id so there is no reconciliation, the settle is the cache
  * invalidation (useCreateTodo onSettled), not this response body.
  *
- * Throws on a non-OK response AND on a malformed success body, so either failure
- * routes to the mutation's onError (which rolls the pending row back) rather than
- * crashing the render — mirrors the read-path malformed-payload guard.
+ * Throws on a non-OK response AND on a malformed success body (validated at
+ * runtime against the shared @tlf/contracts schema, Story 2.1 AC 6), so either
+ * failure routes to the mutation's onError (which rolls the pending row back)
+ * rather than crashing the render — mirrors the read-path malformed-payload guard.
  *
  * Accepts an optional AbortSignal (Story 1.9): a failed-create's Dismiss aborts
  * the in-flight POST via its per-row controller. The `await fetch(...)` is left
@@ -71,11 +61,7 @@ export async function createTodo(
   }
 
   try {
-    const parsed: unknown = await response.json()
-    if (!isTodo(parsed)) {
-      throw new Error('POST /todos returned a malformed response body')
-    }
-    return parsed
+    return parseTodo(await response.json())
   } catch {
     throw new Error('POST /todos returned a malformed response body')
   }
@@ -86,9 +72,11 @@ export async function createTodo(
  * server owns updated_at and never trusts a client timestamp. Mirrors createTodo:
  * throws on a non-OK response (a 404/400/500 routes to useToggleTodo's onError,
  * which reverts the row in place and reconciles) AND on a malformed 2xx body
- * (reusing the isTodo guard), so a bad payload never crashes the render. The
- * returned Todo carries the server's real updated_at — useToggleTodo writes it
- * into the same array position to capture it without re-sorting.
+ * (validated against the shared @tlf/contracts schema, Story 2.1 AC 6), so a bad
+ * payload never crashes the render. Validation does not cover the id-mismatch
+ * case, so the explicit `parsed.id !== id` cross-check is kept. The returned Todo
+ * carries the server's real updated_at — useToggleTodo writes it into the same
+ * array position to capture it without re-sorting.
  */
 export async function patchTodo(
   id: string,
@@ -105,12 +93,28 @@ export async function patchTodo(
   }
 
   try {
-    const parsed: unknown = await response.json()
-    if (!isTodo(parsed) || parsed.id !== id) {
+    const parsed = parseTodo(await response.json())
+    if (parsed.id !== id) {
       throw new Error('PATCH /todos returned a malformed response body')
     }
     return parsed
   } catch {
     throw new Error('PATCH /todos returned a malformed response body')
+  }
+}
+
+/*
+ * Delete a todo (Story 2.1). DELETEs /todos/:id through the same Vite proxy.
+ * This is the ONE wrapper with no @tlf/contracts representation: the endpoint
+ * returns 204 with no body, so it parses no JSON and validates NOTHING — the
+ * 204/no-schema asymmetry is intentional (AC 8). Throws on a non-OK response so
+ * useDeleteTodo's onError fires (rollback + reconcile). The server is idempotent
+ * (204 even for an absent id), so a retry is always safe.
+ */
+export async function deleteTodo(id: string): Promise<void> {
+  const response = await fetch(`/todos/${id}`, { method: 'DELETE' })
+
+  if (!response.ok) {
+    throw new Error(`DELETE /todos/${id} failed: ${response.status}`)
   }
 }

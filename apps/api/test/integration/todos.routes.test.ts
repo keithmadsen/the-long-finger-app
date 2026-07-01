@@ -447,6 +447,64 @@ describe('PATCH /todos/:id toggle path (Story 1.8 AC 1, 7, 9)', () => {
   });
 });
 
+describe('DELETE /todos/:id (idempotent 204) (Story 2.1)', () => {
+  let ctx: TestApp;
+
+  beforeEach(async () => {
+    ctx = await buildTestApp();
+  });
+
+  afterEach(async () => {
+    await ctx.cleanup();
+  });
+
+  function seed() {
+    const { db } = ctx.app.diContainer.cradle;
+    db.prepare(
+      `INSERT INTO todos (id, description, completed, created_at, updated_at)
+       VALUES (@id, @description, @completed, @created_at, @updated_at)`,
+    ).run({
+      id: 'delete-me',
+      description: 'Delete me',
+      completed: 0,
+      created_at: '2026-06-30T09:00:00.000Z',
+      updated_at: '2026-06-30T09:00:00.000Z',
+    });
+  }
+
+  it('204 removes an existing row with an empty body; a subsequent GET no longer includes it (AC 1)', async () => {
+    seed();
+
+    const res = await ctx.app.inject({ method: 'DELETE', url: '/todos/delete-me' });
+
+    expect(res.statusCode).toBe(204);
+    expect(res.body).toBe('');
+
+    const list = await ctx.app.inject({ method: 'GET', url: '/todos' });
+    const ids = (list.json() as { id: string }[]).map((t) => t.id);
+    expect(ids).not.toContain('delete-me');
+  });
+
+  it('204 (idempotent) for an id that was never inserted — body is NOT an error envelope (AC 2)', async () => {
+    const res = await ctx.app.inject({ method: 'DELETE', url: '/todos/never-existed' });
+
+    expect(res.statusCode).toBe(204);
+    expect(res.body).toBe('');
+    expect(res.body).not.toContain('error');
+  });
+
+  it('deleting the same id twice returns 204 both times (idempotent, AC 2)', async () => {
+    seed();
+
+    const first = await ctx.app.inject({ method: 'DELETE', url: '/todos/delete-me' });
+    const second = await ctx.app.inject({ method: 'DELETE', url: '/todos/delete-me' });
+
+    expect(first.statusCode).toBe(204);
+    expect(second.statusCode).toBe(204);
+    expect(second.body).toBe('');
+  });
+});
+
 describe('OpenAPI document (AC 10)', () => {
   let ctx: TestApp;
 
@@ -485,6 +543,14 @@ describe('OpenAPI document (AC 10)', () => {
     expect(patchPath?.patch).toBeDefined();
     expect(JSON.stringify(patchPath)).toContain('PatchTodoBody');
     expect(components.schemas?.PatchTodoBody).toBeDefined();
+  });
+
+  it('exposes DELETE /todos/{id} as an operation (Story 2.1)', () => {
+    const doc = (ctx.app as unknown as { swagger: () => Record<string, unknown> }).swagger();
+    const paths = doc.paths as Record<string, unknown>;
+
+    const idPath = paths['/todos/{id}'] as Record<string, unknown> | undefined;
+    expect(idPath?.delete).toBeDefined();
   });
 });
 

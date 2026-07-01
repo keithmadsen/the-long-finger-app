@@ -178,4 +178,27 @@ describe('todoRepository', () => {
     expect(repo.updateTodo('does-not-exist', { completed: true })).toBeNull();
     db.close();
   });
+
+  it('deleteTodo() removes an existing row, returns true, and drops it from listTodos() (2.1 AC 1, 5)', () => {
+    const { db, repo } = repoWithMemoryDb();
+    seed(db, {
+      id: 'to-delete',
+      description: 'Delete me',
+      completed: 0,
+      created_at: '2026-06-30T09:00:00.000Z',
+      updated_at: '2026-06-30T09:00:00.000Z',
+    });
+
+    const removed = repo.deleteTodo('to-delete');
+
+    expect(removed).toBe(true);
+    expect(repo.listTodos().map((todo) => todo.id)).not.toContain('to-delete');
+    db.close();
+  });
+
+  it('deleteTodo() on a missing id is a no-op returning false (no throw — the route maps it to 204) (2.1 AC 2, 5)', () => {
+    const { db, repo } = repoWithMemoryDb();
+    expect(repo.deleteTodo('does-not-exist')).toBe(false);
+    db.close();
+  });
 });
