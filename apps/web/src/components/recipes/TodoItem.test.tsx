@@ -288,6 +288,100 @@ describe('TodoItem', () => {
     })
   })
 
+  describe('Delete affordance (Story 2.2)', () => {
+    it('renders an idle Delete affordance on an Active row; its accessible name is "Delete" (AC 1)', () => {
+      render(<TodoItem onDeletePress={vi.fn()} todo={makeTodo()} />)
+
+      // The visible text IS the accessible name this story (2.3 enriches it).
+      expect(
+        screen.getByRole('button', { name: 'Delete' }),
+      ).toBeInTheDocument()
+    })
+
+    it('tapping Delete fires onDeletePress and does NOT toggle (pointer stopPropagation, AC 1)', async () => {
+      const user = userEvent.setup()
+      const onToggle = vi.fn()
+      const onDeletePress = vi.fn()
+      render(
+        <TodoItem
+          onDeletePress={onDeletePress}
+          onToggle={onToggle}
+          todo={makeTodo()}
+        />,
+      )
+
+      await user.click(screen.getByRole('button', { name: 'Delete' }))
+
+      expect(onDeletePress).toHaveBeenCalledTimes(1)
+      expect(onToggle).not.toHaveBeenCalled()
+    })
+
+    it('Enter on the Delete button does NOT toggle (keyboard stopPropagation, AC 1)', async () => {
+      // The regression-prone case: the label's handleKeyDown toggles on Enter for
+      // ANY target, so without the button's onKeyDown stopPropagation, Enter would
+      // BOTH activate delete AND toggle completion.
+      const user = userEvent.setup()
+      const onToggle = vi.fn()
+      const onDeletePress = vi.fn()
+      render(
+        <TodoItem
+          onDeletePress={onDeletePress}
+          onToggle={onToggle}
+          todo={makeTodo()}
+        />,
+      )
+
+      screen.getByRole('button', { name: 'Delete' }).focus()
+      await user.keyboard('{Enter}')
+
+      // Native button activation still fires the delete press…
+      expect(onDeletePress).toHaveBeenCalledTimes(1)
+      // …but the toggle must NOT fire.
+      expect(onToggle).not.toHaveBeenCalled()
+    })
+
+    it('the armed prop swaps the label to Confirm and applies the armed class (AC 2)', () => {
+      render(<TodoItem armed onDeletePress={vi.fn()} todo={makeTodo()} />)
+
+      const confirm = screen.getByRole('button', { name: 'Confirm' })
+      expect(confirm).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+      expect(classNameOf(confirm)).toMatch(/armed/)
+    })
+
+    it('a deleting (Committing) row is aria-busy from t=0 and invites no delete press (AC 8)', () => {
+      render(<TodoItem deleting onDeletePress={vi.fn()} todo={makeTodo()} />)
+
+      // Busy immediately — the semantic never waits on the visual delay.
+      expect(screen.getByRole('listitem')).toHaveAttribute('aria-busy', 'true')
+      // The affordance is inert while the DELETE is in flight.
+      expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Confirm' })).toBeNull()
+    })
+
+    it('renders no delete affordance on a pending row (not yet a stable server row)', () => {
+      render(<TodoItem onDeletePress={vi.fn()} pending todo={makeTodo()} />)
+
+      expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+    })
+
+    it('renders no delete affordance on a failed row (Retry/Dismiss only)', () => {
+      render(
+        <TodoItem
+          failed
+          onDeletePress={vi.fn()}
+          onDismiss={vi.fn()}
+          onRetry={vi.fn()}
+          todo={makeTodo()}
+        />,
+      )
+
+      expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument()
+    })
+  })
+
   it('applies the 2-line line-clamp markup to a long description (AC 4)', () => {
     const longText =
       'This is a deliberately very long task description that would wrap well past two lines if it were not clamped at the boundary'

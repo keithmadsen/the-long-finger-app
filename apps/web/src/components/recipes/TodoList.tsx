@@ -1,6 +1,7 @@
 import type { Todo } from '@tlf/contracts'
 
 import { TodoItem } from './TodoItem'
+import { useArmedDelete } from '../../hooks/useArmedDelete'
 import styles from './TodoList.module.css'
 
 export interface TodoListProps {
@@ -19,6 +20,10 @@ export interface TodoListProps {
   onDismiss?: (id: string) => void
   /** Id of the shared hidden help text every failed row references (AC 5). */
   describedById?: string
+  /** Commit a confirmed delete by id (2.2). Wired by App to useDeleteTodo. */
+  onDelete?: (id: string) => void
+  /** Ids whose DELETE is in flight — each maps to a Committing <TodoItem> (2.1). */
+  deletingIds?: ReadonlySet<string>
 }
 
 /*
@@ -26,10 +31,11 @@ export interface TodoListProps {
  * ORDER RECEIVED — the backend (completed ASC, updated_at DESC) is the single
  * canonical-order authority and the frontend never re-sorts (AC 8).
  *
- * Deliberately a plain ordered render for now: no roving-tabindex (Epic 3 /
- * UX-DR24) and no armed-delete coordination (Epic 2). The hybrid in-place vs.
- * reorder session rule (UX-DR17) is NOT exercised here — there is no toggle in
- * 1.6 — so Story 1.8 can add in-place behavior without surprise.
+ * No roving-tabindex yet (Epic 3 / UX-DR24). Armed-delete coordination (Epic 2 /
+ * UX-DR-delete) lives HERE (epics AC 5, "coordination owned by <TodoList>"): the
+ * useArmedDelete state machine enforces the single-armed invariant across rows
+ * and drives each row's `armed` prop. The hybrid in-place vs. reorder session
+ * rule (UX-DR17) is unchanged.
  *
  * <ul> already carries the list role; the explicit role="list" guards against
  * the list-role being stripped when list-style is removed in some browsers.
@@ -43,7 +49,16 @@ export function TodoList({
   onRetry,
   onDismiss,
   describedById,
+  onDelete,
+  deletingIds,
 }: TodoListProps) {
+  // The single-armed arm-then-confirm state machine (AC 5). A confirmed press
+  // calls back into App's delete mutation. The 300 ms / 5 s timers run on the
+  // default realClock in production; Story 2.3 injects a fake clock for races.
+  const { armedId, press, cancel } = useArmedDelete({
+    onCommit: (id) => onDelete?.(id),
+  })
+
   return (
     <ul className={styles.list} role="list">
       {todos.map((todo) => {
@@ -53,8 +68,12 @@ export function TodoList({
         return (
           <TodoItem
             key={todo.id}
+            armed={armedId === todo.id}
+            deleting={deletingIds?.has(todo.id) ?? false}
             describedById={describedById}
             failed={isFailed}
+            onDeleteCancel={cancel}
+            onDeletePress={isFailed ? undefined : () => press(todo.id)}
             onDismiss={() => onDismiss?.(todo.id)}
             onRetry={() => onRetry?.(todo.id)}
             onToggle={(completed) => onToggle?.(todo.id, completed)}

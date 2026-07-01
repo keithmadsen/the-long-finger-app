@@ -134,3 +134,71 @@
   font-size: var(--font-size-secondary);
   font-weight: var(--font-weight-medium);
 }
+
+/*
+ * Inline two-step delete affordance (Story 2.2, AC 1, 2). Mirrors the
+ * .failed .retry/.dismiss recipe: it is scoped so it out-specifies the <Button>
+ * primitive base colour, while the primitive keeps its focus ring + forced-colors
+ * border (we do NOT strip them). Right-aligned so it sits at the row's end
+ * without disturbing the checkbox/description layout.
+ */
+.delete {
+  margin-inline-start: auto;
+  flex: none;
+  color: var(--color-on-surface-muted);
+  font-size: var(--font-size-secondary);
+  font-weight: var(--font-weight-medium);
+  /*
+   * The idle→armed colour change settles via --motion-settle (AC 2), which the
+   * token collapses to 0ms under prefers-reduced-motion. No size/weight/position
+   * change, no overlay — armed is a colour + label swap only (UX-DR22).
+   */
+  transition: color var(--motion-settle) var(--motion-ease);
+}
+
+/* Armed: the affordance reads Confirm in the error colour (AC 2). */
+.armed {
+  color: var(--color-error);
+}
+
+/*
+ * Hover reveal (AC 1): the affordance is ALWAYS visible on touch (the base rule
+ * above); on pointer devices it is hidden until the row is hovered/focused. Never
+ * display:none/visibility:hidden — the button must stay keyboard-focusable and in
+ * the a11y tree so Tab reveals it (:focus-within / :focus-visible). An armed row
+ * whose pointer has left stays visible too.
+ */
+@media (hover: hover) {
+  .delete {
+    opacity: 0;
+    transition:
+      color var(--motion-settle) var(--motion-ease),
+      opacity var(--motion-settle) var(--motion-ease);
+  }
+
+  /* Ordered by ascending specificity (no-descending-specificity). */
+  .armed,
+  .delete:focus-visible,
+  .item:hover .delete,
+  .item:focus-within .delete {
+    opacity: 1;
+  }
+
+  /* Subtle row hover affordance on pointer devices (UX line 765). */
+  .item:hover {
+    background: var(--color-surface-hover);
+  }
+}
+
+/*
+ * Committing fade (AC 8). Applied while the DELETE is in flight and past the
+ * flicker threshold (gated by showPending, like .pending). The row dims via
+ * opacity transitioned by --motion-settle so it visibly fades before the
+ * onSettled refetch removes it — honest-pending never optimistically removes the
+ * row (Story 2.1). Row height stays stable (UX-DR22) so removal does not reflow
+ * abruptly. Reduced motion collapses --motion-settle → instant.
+ */
+.committing {
+  opacity: 0.5;
+  transition: opacity var(--motion-settle) var(--motion-ease);
+}

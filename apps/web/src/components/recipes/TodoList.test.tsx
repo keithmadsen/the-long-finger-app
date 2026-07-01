@@ -1,8 +1,10 @@
 import type { Todo } from '@tlf/contracts'
-import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { TodoList } from './TodoList'
+import { DELETE_NO_COMMIT_WINDOW_MS } from '../../hooks/useArmedDelete'
 
 const TODOS: Todo[] = [
   {
@@ -37,5 +39,80 @@ describe('TodoList', () => {
       .map((item) => within(item).getByText(/render me/).textContent)
 
     expect(rendered).toEqual(['render me first', 'render me second'])
+  })
+
+  describe('armed-delete coordination (Story 2.2)', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('arming one row shows Confirm on it and Delete on the other (idle default)', async () => {
+      const user = userEvent.setup()
+      render(<TodoList onDelete={vi.fn()} todos={TODOS} />)
+
+      // Both rows start idle with a Delete affordance.
+      expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(2)
+
+      await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!)
+
+      // Exactly one row is armed (Confirm); the other stays idle (Delete).
+      expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1)
+    })
+
+    it('arming a second row reverts the first — single-armed invariant (AC 5)', async () => {
+      const user = userEvent.setup()
+      render(<TodoList onDelete={vi.fn()} todos={TODOS} />)
+
+      // Arm the first row.
+      await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!)
+      expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument()
+
+      // Arm the (now only) other idle row → the first must revert to Delete.
+      await user.click(screen.getByRole('button', { name: 'Delete' }))
+
+      expect(screen.getAllByRole('button', { name: 'Confirm' })).toHaveLength(1)
+      expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1)
+    })
+
+    it('a confirm press after the no-commit window calls onDelete once with the id (AC 7)', () => {
+      // Timing driven deterministically: realClock reads Date.now(), which fake
+      // timers control. Exhaustive timing lives in useArmedDelete.test.ts; this
+      // proves the TodoList → onCommit → onDelete wiring across the window.
+      vi.useFakeTimers()
+      const onDelete = vi.fn()
+      render(<TodoList onDelete={onDelete} todos={TODOS} />)
+
+      // Arm the first row ('b'). fireEvent (not userEvent) so it composes with
+      // fake timers and does not dispatch the tap-away pointerdown.
+      fireEvent.click(screen.getAllByRole('button', { name: 'Delete' })[0]!)
+      expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument()
+
+      // Cross the 300 ms muscle-memory window, then confirm.
+      act(() => vi.advanceTimersByTime(DELETE_NO_COMMIT_WINDOW_MS))
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
+
+      expect(onDelete).toHaveBeenCalledTimes(1)
+      expect(onDelete).toHaveBeenCalledWith('b')
+    })
+
+    it('a pointerdown outside any armed affordance reverts to idle (AC 5)', async () => {
+      const user = userEvent.setup()
+      render(
+        <div>
+          <TodoList onDelete={vi.fn()} todos={TODOS} />
+          <button type="button">outside</button>
+        </div>,
+      )
+
+      await user.click(screen.getAllByRole('button', { name: 'Delete' })[0]!)
+      expect(screen.getByRole('button', { name: 'Confirm' })).toBeInTheDocument()
+
+      // Tapping anywhere outside the armed affordance reverts it.
+      await user.click(screen.getByRole('button', { name: 'outside' }))
+
+      expect(screen.queryByRole('button', { name: 'Confirm' })).toBeNull()
+      expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(2)
+    })
   })
 })

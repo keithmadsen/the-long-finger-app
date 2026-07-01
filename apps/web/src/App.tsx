@@ -7,6 +7,7 @@ import { EmptyState } from './components/recipes/EmptyState'
 import { TodoList } from './components/recipes/TodoList'
 import { UnreadErrorIndicator } from './components/recipes/UnreadErrorIndicator'
 import { useCreateTodo } from './hooks/useCreateTodo'
+import { useDeleteTodo } from './hooks/useDeleteTodo'
 import { useToggleTodo } from './hooks/useToggleTodo'
 import { useTodos } from './hooks/useTodos'
 import styles from './App.module.css'
@@ -47,8 +48,14 @@ const FAILED_CREATE_HELP_TEXT =
  * above" affordance rendered to the RIGHT of the capture input (input stays
  * first in DOM order — first-interactive invariant), the App-owned
  * unread/acknowledged + focus-visibility state, and the activate handler that
- * scrolls + focuses the first failed row's Retry. Explicitly NOT here (later
- * stories): delete (Epic 2). Do not stub it.
+ * scrolls + focuses the first failed row's Retry.
+ *
+ * Story 2.2 wires delete: App owns the delete mutation (useDeleteTodo — like
+ * create/toggle, so its in-flight `deletingIds` reach the list and drive each
+ * row's Committing/aria-busy presentation). <TodoList> owns the armed-state
+ * (arm-then-confirm) coordination via useArmedDelete; App only supplies onDelete
+ * + deletingIds. Deletion announcements + aria-pressed are Story 2.3 — no announce
+ * is passed here.
  */
 function App() {
   const { data, isPending, isError, refetch } = useTodos()
@@ -101,6 +108,12 @@ function App() {
   // The toggle mutation is owned HERE (like create) so its in-flight ids reach
   // the list and drive each row's honest-pending presentation (1.7 precedent).
   const { toggle, togglingCompletedById } = useToggleTodo({ announce })
+
+  // The delete mutation is owned HERE too (Story 2.2). `deletingIds` (the
+  // Committing marker from 2.1's honest-pending onMutate) reaches the list so
+  // each row can render aria-busy + the committing fade. The armed-state timing
+  // lives in <TodoList>'s useArmedDelete, not here.
+  const { deleteTodo, deletingIds } = useDeleteTodo()
 
   // Reactive <title> (AC 7): "the long finger (N active)", count omitted at zero.
   useEffect(() => {
@@ -318,8 +331,10 @@ function App() {
     }
     return (
       <TodoList
+        deletingIds={deletingIds}
         describedById={FAILED_CREATE_HELP_ID}
         failedIds={failedIds}
+        onDelete={deleteTodo}
         onDismiss={dismiss}
         onRetry={retry}
         onToggle={toggle}
