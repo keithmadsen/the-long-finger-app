@@ -75,6 +75,44 @@ The integration test builds the Fastify app against a real temp-file SQLite data
 npm run typecheck        # tsc --noEmit across all workspaces
 ```
 
+## Running the container
+
+The app ships as a single multi-stage image (`Dockerfile` at the repo root). The
+builder stage installs dependencies and builds the web SPA; the runner stage
+serves both the built SPA and the four API routes from **one origin / one port**
+via Fastify + `@fastify/static`. There is no Vite proxy and no CORS in
+production — the web app's relative `fetch('/todos')` calls resolve same-origin.
+
+Build and run, mounting a named volume so the SQLite database survives restarts:
+
+```bash
+docker build -t the-long-finger .
+docker run -p 8080:8080 -e PORT=8080 -e DATABASE_PATH=/data/todos.db -v tlf-data:/data the-long-finger
+```
+
+Then open `http://localhost:8080` to view, add, and complete/uncomplete tasks.
+`GET /health` returns `{"status":"ok"}` and `/docs` serves the OpenAPI UI.
+
+**Config:** the image reads `PORT` and `DATABASE_PATH` from the environment and
+ships container defaults (`PORT=8080`, `DATABASE_PATH=/data/todos.db`). `/data`
+is declared as a volume; the API creates the parent directory on first boot, so
+a fresh volume initialises cleanly.
+
+**Persistence check:** create a task, then stop and restart the container with
+the **same** volume — the task is still present:
+
+```bash
+docker stop <container>
+docker start <container>   # restarts the same container, which already has tlf-data mounted
+```
+
+> **Security headers:** the API applies `@fastify/helmet` baseline headers and a
+> 64 KiB request-body limit. A strict Content-Security-Policy and hardened
+> static-serving headers (COEP/CORP) are intentionally deferred to Epic 3
+> Story 3.5 — enabling helmet's default CSP now would break the bundled SPA.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request: install → type-check → Vitest `unit` project → Vitest `integration` project. Any failure blocks merge.
+
+The Docker image build is verified manually (build + run + browser + restart-persistence); it is intentionally **not** part of the per-PR CI gate (CI expansion is owned by Epic 3).
