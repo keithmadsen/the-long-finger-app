@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import type { Todo } from '@tlf/contracts'
 
 import { deleteTodo as deleteTodoRequest } from '../api/todos'
 
@@ -13,8 +14,8 @@ import { deleteTodo as deleteTodoRequest } from '../api/todos'
  *     the row is NOT removed — it is marked *Committing* via a client-only
  *     `deletingIds` set and stays visible until the backend confirms (FR-3).
  *     Story 2.2 consumes `deletingIds` to render the Committing/aria-busy visual.
- *   • onError restores the snapshot (the row was never removed, so nothing is
- *     silently lost, AC 4); the onSettled refetch reconciles to backend truth.
+ *   • onError writes nothing to the cache (the row was never removed, so there is
+ *     no snapshot to restore); the onSettled refetch reconciles to backend truth.
  *   • onSettled invalidates ['todos'] UNCONDITIONALLY (AC 3): on success the
  *     refetch drops the deleted row; on error it restores it. This is the
  *     opposite of toggle, which never invalidates on success (a re-sort would
@@ -22,17 +23,25 @@ import { deleteTodo as deleteTodoRequest } from '../api/todos'
  *     invalidate" logic here — a refetch after delete is exactly correct.
  *
  * `deletingIds` is presentation state, NEVER a field on the Todo contract
- * (1.7/1.8 precedent). Announcements (LiveRegion "{description} deleted.") are
- * Story 2.3 — deliberately NOT here (no announce option, no dead code); the
- * mutation variables stay `{ id }` only. This hook is NOT wired into App/TodoList/
- * TodoItem in this story ("before any delete UI exists") — that is Story 2.2.
+ * (1.7/1.8 precedent). Announcements are wired HERE in Story 2.3 (no longer
+ * deferred): `onSuccess` announces "{description} deleted." (terminal, no undo)
+ * and `onError` reuses toggle's shared mutation-failure copy. The `description`
+ * is read from the cache at call time (mirroring useToggleTodo) and threaded
+ * through the mutation variables purely for the announcement string.
  */
+
+export interface UseDeleteTodoOptions {
+  /** Confirmation/failure announcer — the single App-owned LiveRegion (AC 2, 5). */
+  announce?: (message: string) => void
+}
 
 interface DeleteVariables {
   id: string
+  /** Carried for the announcement string — read from the cache row at call time. */
+  description: string
 }
 
-export function useDeleteTodo() {
+export function useDeleteTodo({ announce }: UseDeleteTodoOptions = {}) {
   const queryClient = useQueryClient()
   const inFlightIdsRef = useRef<Set<string>>(new Set())
   // Client-only presentation state: the set of row ids currently being deleted
@@ -71,13 +80,29 @@ export function useDeleteTodo() {
       addDeleting(id)
     },
 
-    // No onError cache rollback (code-review finding): because onMutate never
-    // removed the row, there is nothing to restore, and blindly writing back a
-    // pre-mutation snapshot would be actively wrong under concurrency — a later
-    // failure could resurrect a sibling row that a parallel delete had already
-    // removed. The item is never silently lost (AC 4) precisely because it was
-    // never optimistically removed; the onSettled invalidate reconciles both
-    // paths to backend truth.
+    onSuccess: (_data, { description }) => {
+      // The 204 confirms the row is gone; the announcement is TERMINAL — no undo
+      // copy (AC 2). "Once" is naturally satisfied (onSuccess fires once per
+      // successful mutation). Do NOT touch the cache here — the onSettled
+      // invalidate is what drops the row (honest-pending).
+      announce?.(`${description} deleted.`)
+    },
+
+    // onError is ANNOUNCE-ONLY (AC 5): no cache rollback (code-review finding).
+    // Because onMutate never removed the row, there is nothing to restore, and
+    // blindly writing back a pre-mutation snapshot would be actively wrong under
+    // concurrency — a later failure could resurrect a sibling row that a parallel
+    // delete had already removed. The item is never silently lost (AC 4)
+    // precisely because it was never optimistically removed; the onSettled
+    // invalidate reconciles both paths to backend truth. The copy is the SAME
+    // string useToggleTodo.onError emits — the UX spec shares one mutation-
+    // failure announcement across toggle AND delete (curly apostrophe + quotes).
+    onError: (_error, { description }) => {
+      announce?.(
+        `Couldn’t update “${description}”. The list refreshed to current state.`,
+      )
+    },
+
     onSettled: (_data, _error, { id }) => {
       removeDeleting(id)
       // Unconditional reconcile (AC 3, 4): success drops the row, a failure
@@ -87,11 +112,15 @@ export function useDeleteTodo() {
   })
 
   // deleteTodo(id): per-row in-flight arbitration — if this row already has a
-  // delete in flight, do NOT fire a conflicting second mutation.
+  // delete in flight, do NOT fire a conflicting second mutation. The description
+  // is read from the current cache row so the announcement has it (mirroring
+  // useToggleTodo.toggle); arbitration stays keyed on id alone.
   function deleteTodo(id: string) {
     if (inFlightIdsRef.current.has(id)) return
     inFlightIdsRef.current.add(id)
-    mutation.mutate({ id })
+    const current = queryClient.getQueryData<Todo[]>(['todos'])
+    const description = current?.find((todo) => todo.id === id)?.description ?? ''
+    mutation.mutate({ id, description })
   }
 
   return { deleteTodo, deletingIds }

@@ -835,21 +835,24 @@ describe('App delete (Story 2.2)', () => {
 
     const list = await screen.findByRole('list')
     // The delete affordance is present on server rows (App → TodoList wiring).
+    // Story 2.3 enriched the accessible name via aria-label (Delete '{desc}').
     expect(
-      within(list).getAllByRole('button', { name: 'Delete' }),
+      within(list).getAllByRole('button', { name: /^Delete '/ }),
     ).toHaveLength(2)
 
     // Arm the 'delete me' row.
     const row = screen.getByText('delete me').closest('li')!
     vi.useFakeTimers()
-    fireEvent.click(within(row).getByRole('button', { name: 'Delete' }))
+    fireEvent.click(within(row).getByRole('button', { name: /^Delete '/ }))
     expect(
-      within(row).getByRole('button', { name: 'Confirm' }),
+      within(row).getByRole('button', { name: /^Confirm deletion of/ }),
     ).toBeInTheDocument()
 
     // Cross the 300 ms muscle-memory window deterministically, then confirm.
     act(() => vi.advanceTimersByTime(DELETE_NO_COMMIT_WINDOW_MS))
-    fireEvent.click(within(row).getByRole('button', { name: 'Confirm' }))
+    fireEvent.click(
+      within(row).getByRole('button', { name: /^Confirm deletion of/ }),
+    )
     vi.useRealTimers()
 
     // A DELETE was issued for row 'a'.
@@ -875,5 +878,33 @@ describe('App delete (Story 2.2)', () => {
     )
     // The sibling row is untouched.
     expect(screen.getByText('keep me')).toBeInTheDocument()
+  })
+
+  it('announces "{description} deleted." via the LiveRegion when a delete commits (Story 2.3 AC 2)', async () => {
+    stubServer([todo({ id: 'a', description: 'delete me' })])
+
+    renderWithClient(<App />)
+
+    const row = (await screen.findByText('delete me')).closest('li')!
+    vi.useFakeTimers()
+    fireEvent.click(within(row).getByRole('button', { name: /^Delete '/ }))
+    // Cross the 300 ms muscle-memory window, then confirm the commit.
+    act(() => vi.advanceTimersByTime(DELETE_NO_COMMIT_WINDOW_MS))
+    fireEvent.click(
+      within(row).getByRole('button', { name: /^Confirm deletion of/ }),
+    )
+    vi.useRealTimers()
+
+    // Wait until the deferred DELETE is actually in flight (Committing) — only then
+    // is releaseDelete wired — before releasing it.
+    await waitFor(() => expect(row).toHaveAttribute('aria-busy', 'true'))
+
+    // Release the DELETE so onSuccess fires and the refetch drops the row.
+    act(() => releaseDelete?.())
+    await waitFor(() =>
+      expect(screen.queryByText('delete me')).not.toBeInTheDocument(),
+    )
+    // App → useDeleteTodo({ announce }) → the single LiveRegion carries the copy.
+    expect(screen.getByRole('status')).toHaveTextContent('delete me deleted.')
   })
 })

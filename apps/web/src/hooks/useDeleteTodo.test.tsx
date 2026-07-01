@@ -38,11 +38,11 @@ function stubFetch(opts: { getList?: () => Todo[]; failIds?: string[] } = {}) {
   return fetchMock
 }
 
-function setup(client: QueryClient) {
+function setup(client: QueryClient, announce?: (m: string) => void) {
   function wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={client}>{children}</QueryClientProvider>
   }
-  return renderHook(() => useDeleteTodo(), { wrapper })
+  return renderHook(() => useDeleteTodo({ announce }), { wrapper })
 }
 
 describe('useDeleteTodo (Story 2.1)', () => {
@@ -138,5 +138,52 @@ describe('useDeleteTodo (Story 2.1)', () => {
     })
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+  })
+})
+
+describe('useDeleteTodo announcements (Story 2.3)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('announces "{description} deleted." exactly once on success, reading the description from the cache (AC 2)', async () => {
+    const client = createTestQueryClient()
+    const announce = vi.fn()
+    client.setQueryData<Todo[]>(['todos'], [
+      todo({ id: 'a', description: 'Buy milk' }),
+    ])
+    stubFetch({ getList: () => [] })
+
+    const { result } = setup(client, announce)
+    act(() => result.current.deleteTodo('a'))
+
+    await waitFor(() => expect(announce).toHaveBeenCalledTimes(1))
+    // Terminal announcement — no undo copy.
+    expect(announce).toHaveBeenCalledWith('Buy milk deleted.')
+  })
+
+  it('announces the shared mutation-failure copy once on error and does NOT write the cache in onError (AC 5)', async () => {
+    const client = createTestQueryClient()
+    const announce = vi.fn()
+    client.setQueryData<Todo[]>(['todos'], [
+      todo({ id: 'a', description: 'Buy milk' }),
+    ])
+    // Spy AFTER seeding so the seed write is not counted.
+    const setSpy = vi.spyOn(client, 'setQueryData')
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries')
+    stubFetch({ getList: () => [], failIds: ['a'] })
+
+    const { result } = setup(client, announce)
+    act(() => result.current.deleteTodo('a'))
+
+    await waitFor(() => expect(announce).toHaveBeenCalledTimes(1))
+    // The SAME string useToggleTodo.onError emits (curly apostrophe + curly quotes).
+    expect(announce).toHaveBeenCalledWith(
+      'Couldn’t update “Buy milk”. The list refreshed to current state.',
+    )
+    // onError is announce-only: no cache rollback write (the row was never removed).
+    expect(setSpy).not.toHaveBeenCalled()
+    // The onSettled invalidate remains the single reconcile (AC 5).
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['todos'] })
   })
 })
