@@ -4,7 +4,7 @@ baseline_commit: 836f088e27766d919e4726dde61d9f01445775ae
 
 # Story 2.3: Delete accessibility & state-race hardening
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -130,6 +130,10 @@ Story 2.2 shipped the **visual + timing state machine**: `useArmedDelete` (singl
 ### H. Full-suite verification (all ACs)
 
 - [x] **Task H1: Run the whole gate.** **API tests require Node 24** (`nvm use 24` first — better-sqlite3 ABI; shell default is Node 22). This story is web-only in code, but run the full gate: `npm test` (web + api unit/integration), `npm run typecheck`, `npm run build`, `npm run lint --workspace apps/web` (eslint), `npm run lint:css --workspace apps/web` + `lint:css:selftest`, `npm run contrast:check --workspace apps/web`, and `npm run size:check --workspace apps/web`. This story adds attributes + a small effect + hook announce code + tests — a minimal bundle delta (no new deps); if the ratchet trips, confirm the increase is only this story's code and rebaseline per the established convention (Keith-approved rebaselines are the norm).
+
+### Review Findings
+
+- [x] [Review][Patch] `useDeleteTodo` header comment still describes rollback/snapshot behavior that no longer exists [apps/web/src/hooks/useDeleteTodo.ts:17]
 
 ## Dev Notes
 

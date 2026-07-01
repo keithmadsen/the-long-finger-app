@@ -122,7 +122,7 @@ development_status:
   epic-2: in-progress
   2-1-delete-endpoint-mutation: done
   2-2-inline-two-step-delete-affordance: done
-  2-3-delete-accessibility-state-race-hardening: review
+  2-3-delete-accessibility-state-race-hardening: done
   epic-2-retrospective: optional
 
   # Epic 3: Production Readiness & Delivery

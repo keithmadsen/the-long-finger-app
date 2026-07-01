@@ -14,8 +14,8 @@ import { deleteTodo as deleteTodoRequest } from '../api/todos'
  *     the row is NOT removed — it is marked *Committing* via a client-only
  *     `deletingIds` set and stays visible until the backend confirms (FR-3).
  *     Story 2.2 consumes `deletingIds` to render the Committing/aria-busy visual.
- *   • onError restores the snapshot (the row was never removed, so nothing is
- *     silently lost, AC 4); the onSettled refetch reconciles to backend truth.
+ *   • onError writes nothing to the cache (the row was never removed, so there is
+ *     no snapshot to restore); the onSettled refetch reconciles to backend truth.
  *   • onSettled invalidates ['todos'] UNCONDITIONALLY (AC 3): on success the
  *     refetch drops the deleted row; on error it restores it. This is the
  *     opposite of toggle, which never invalidates on success (a re-sort would
