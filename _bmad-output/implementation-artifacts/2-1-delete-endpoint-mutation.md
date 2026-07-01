@@ -4,7 +4,7 @@ baseline_commit: 750d86fc76d7a79febd61ab972bbe5e6242a50bc
 
 # Story 2.1: Delete endpoint & mutation
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
