@@ -36,6 +36,9 @@
 
 generated: 2026-06-16
 last_updated: 2026-07-01
+# 2026-07-01: 2-1 → in-progress (dev-story)
+# 2026-07-01: 2-1 → review (dev-story complete)
+# 2026-07-01: 2-1 → done (code-review patches applied)
 project: the long finger
 # 2026-06-16: epic-1 → in-progress, 1-1 → ready-for-dev (create-story)
 # 2026-06-16: 1-1 → in-progress (dev-story)
@@ -87,6 +90,7 @@ project: the long finger
 # 2026-07-01: 1-11 → merged to main (PR #13)
 # 2026-07-01: epic-1 → done (all 11 stories complete)
 # 2026-07-01: epic-1-retrospective → done; container deploy verified end-to-end via docker build/run
+# 2026-07-01: epic-2 → in-progress, 2-1 → ready-for-dev (create-story); runtime schema validation folded in per retro action item 2
 project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"
@@ -108,8 +112,8 @@ development_status:
   epic-1-retrospective: done
 
   # Epic 2: Safe Delete
-  epic-2: backlog
-  2-1-delete-endpoint-mutation: backlog
+  epic-2: in-progress
+  2-1-delete-endpoint-mutation: done
   2-2-inline-two-step-delete-affordance: backlog
   2-3-delete-accessibility-state-race-hardening: backlog
   epic-2-retrospective: optional

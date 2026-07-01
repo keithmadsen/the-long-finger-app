@@ -28,6 +28,7 @@ export function todoRepository({ db }: Dependencies) {
   const updateStatement = db.prepare(
     'UPDATE todos SET completed = @completed, updated_at = @updated_at WHERE id = @id',
   );
+  const deleteStatement = db.prepare('DELETE FROM todos WHERE id = ?');
 
   // The SINGLE place casing crosses over and `completed` is coerced to boolean
   // (AC 4). No mapping logic exists anywhere else in the codebase.
@@ -88,5 +89,17 @@ export function todoRepository({ db }: Dependencies) {
     return toDomain(row);
   }
 
-  return { listTodos, insertTodo, updateTodo };
+  // Hard delete (FR-6, NG-6 — permanent, no soft-delete, no `deletedAt`, no
+  // schema migration). Returns whether a row was actually removed: a missing id
+  // is a NO-OP returning `false`, NOT a throw and NOT an error — mirroring
+  // `insertTodo`'s `changes > 0` "created" signal and `updateTodo`'s null-on-
+  // missing discipline. Unlike `updateTodo`'s 404-on-missing, the DELETE route
+  // maps a missing id to 204, NOT 404 (idempotency, Story 2.1 AC 2), so this
+  // boolean is consumed only by unit tests / future callers — never to branch
+  // the HTTP status.
+  function deleteTodo(id: string): boolean {
+    return deleteStatement.run(id).changes > 0;
+  }
+
+  return { listTodos, insertTodo, updateTodo, deleteTodo };
 }

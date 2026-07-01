@@ -15,8 +15,8 @@ const todoParams = Type.Object({ id: Type.String() });
 const errorResponse = Type.Unsafe<ErrorEnvelope>(Type.Ref('ErrorEnvelope'));
 
 // /todos — resolves the repository from the cradle. The route stays thin: no DB
-// knowledge, no casing (the repository's mapper owns that). PATCH/DELETE are
-// Stories 1.8/2.x.
+// knowledge, no casing (the repository's mapper owns that). PATCH (1.8) and
+// DELETE (2.1) are implemented below.
 //
 // The schemas enforce the contract at the boundary (Fastify serializes responses
 // against them, stripping non-schema fields; Ajv validates the POST body) and
@@ -109,6 +109,36 @@ export default async function todosRoute(app: FastifyInstance): Promise<void> {
         });
       }
       return todo;
+    },
+  );
+
+  // DELETE /todos/:id — hard delete (Story 2.1). The DELIBERATE asymmetry vs.
+  // PATCH: delete is IDEMPOTENT, so a missing id also returns 204 (AC 2), NOT
+  // 404. There is NO domain decision here — no computation, no status branch —
+  // so the repository boolean is intentionally ignored (it exists only for unit
+  // tests / future callers). This makes the handler pure transport, the
+  // strongest case yet for staying inline (no `delete-todo.handler.ts` factory;
+  // see the handler-placement note above). `response: { 204: Type.Null() }`
+  // documents the no-content response in OpenAPI; `reply.status(204).send()`
+  // (no argument) sends no body — Fastify does not serialize a payload for 204.
+  typedApp.delete(
+    '/todos/:id',
+    {
+      schema: {
+        params: todoParams,
+        response: {
+          204: Type.Null(),
+          500: errorResponse,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { todoRepository } = request.diScope.cradle;
+      todoRepository.deleteTodo(request.params.id);
+      // `send(null)` satisfies the `204: Type.Null()` typed-provider signature;
+      // Fastify writes NO body for a 204 regardless (verified by the integration
+      // test asserting an empty body).
+      return reply.status(204).send(null);
     },
   );
 }

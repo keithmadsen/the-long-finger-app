@@ -1,7 +1,7 @@
 import type { CreateTodoBody, Todo } from '@tlf/contracts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { createTodo, patchTodo } from './todos'
+import { createTodo, deleteTodo, patchTodo } from './todos'
 
 const BODY: CreateTodoBody = {
   id: '0190ff8c-3e5a-7c1d-8b2e-1a2b3c4d5e6f',
@@ -197,5 +197,50 @@ describe('patchTodo (Story 1.8)', () => {
     await expect(patchTodo(BODY.id, { completed: true })).rejects.toThrow(
       'PATCH /todos returned a malformed response body',
     )
+  })
+})
+
+describe('deleteTodo (Story 2.1)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('DELETEs to /todos/:id and resolves undefined on a 204 (no body parsed)', async () => {
+    const jsonSpy = vi.fn()
+    const fetchMock = vi.fn(async () => {
+      const res = new Response(null, { status: 204 })
+      // Prove the wrapper never touches the body on the 204 path (AC 8).
+      Object.defineProperty(res, 'json', { value: jsonSpy })
+      return res
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(deleteTodo(BODY.id)).resolves.toBeUndefined()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe(`/todos/${BODY.id}`)
+    expect(init.method).toBe('DELETE')
+    expect(jsonSpy).not.toHaveBeenCalled()
+  })
+
+  it('throws on a non-OK response so the mutation onError fires (e.g. 500)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('', { status: 500 })),
+    )
+
+    await expect(deleteTodo(BODY.id)).rejects.toThrow(/500/)
+  })
+
+  it('throws on an unexpected 2xx (only 204 confirms a delete) (review finding)', async () => {
+    // A backend regression returning 200 must NOT be silently accepted as a
+    // confirmed delete — the 204 contract is strict.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 })),
+    )
+
+    await expect(deleteTodo(BODY.id)).rejects.toThrow(/200/)
   })
 })
