@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { buildServer } from './server.js';
 
 function readPort(value: string | undefined): number {
@@ -19,7 +21,14 @@ function readDatabasePath(value: string | undefined): string {
 const port = readPort(process.env.PORT);
 const databasePath = readDatabasePath(process.env.DATABASE_PATH);
 
-const app = await buildServer({ databasePath });
+// Resolve the built web dir (apps/api/src → apps/web/dist) and serve it only
+// when it exists, so the container (web is built into the image) serves the SPA
+// same-origin, while a local `npm run start --workspace apps/api` with no web
+// build still boots headless.
+const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
+const staticRoot = existsSync(webDist) ? webDist : undefined;
+
+const app = await buildServer({ databasePath, staticRoot });
 
 try {
   await app.listen({ port, host: '0.0.0.0' });
