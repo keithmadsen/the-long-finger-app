@@ -1,10 +1,11 @@
 import type { Todo } from '@tlf/contracts'
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
 import { renderWithClient } from './test/queryClient'
+import { DELETE_NO_COMMIT_WINDOW_MS } from './hooks/useArmedDelete'
 
 const LOAD_FAILURE_MESSAGE = 'Couldn’t load your list. Refresh to try again.'
 const INSTRUCTION_LINE = 'Type a task and press Enter to add it to your list.'
@@ -39,6 +40,7 @@ describe('App', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
   })
 
@@ -782,5 +784,96 @@ describe('App unread-error indicator (Story 1.10)', () => {
       await screen.findByRole('button', { name: indicatorName(2) }),
     ).toBeInTheDocument()
     expect(screen.getByText('2 errors above')).toBeInTheDocument()
+  })
+})
+
+describe('App delete (Story 2.2)', () => {
+  beforeEach(() => {
+    document.title = ''
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  // A stateful server double: GET returns the current list; DELETE is DEFERRED
+  // (resolves only when releaseDelete() is called) so the Committing (aria-busy)
+  // state is observable before the settle refetch drops the row. The releasing
+  // DELETE removes the id, so the invalidation refetch returns without it.
+  let releaseDelete: (() => void) | undefined
+  function stubServer(initial: Todo[]) {
+    let serverTodos = [...initial]
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      if (method === 'GET') return okResponse(serverTodos)
+      if (method === 'DELETE') {
+        const id = String(url).split('/').pop() as string
+        return new Promise<Response>((resolve) => {
+          releaseDelete = () => {
+            serverTodos = serverTodos.filter((t) => t.id !== id)
+            resolve(new Response(null, { status: 204 }))
+          }
+        })
+      }
+      throw new Error(`unexpected ${method} in delete test`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  function okResponse(payload: unknown) {
+    return new Response(JSON.stringify(payload), { status: 200 })
+  }
+
+  it('wires delete: committing a row issues DELETE, marks it aria-busy, and the refetch drops it (AC 8)', async () => {
+    const fetchMock = stubServer([
+      todo({ id: 'a', description: 'delete me' }),
+      todo({ id: 'b', description: 'keep me' }),
+    ])
+
+    renderWithClient(<App />)
+
+    const list = await screen.findByRole('list')
+    // The delete affordance is present on server rows (App → TodoList wiring).
+    expect(
+      within(list).getAllByRole('button', { name: 'Delete' }),
+    ).toHaveLength(2)
+
+    // Arm the 'delete me' row.
+    const row = screen.getByText('delete me').closest('li')!
+    vi.useFakeTimers()
+    fireEvent.click(within(row).getByRole('button', { name: 'Delete' }))
+    expect(
+      within(row).getByRole('button', { name: 'Confirm' }),
+    ).toBeInTheDocument()
+
+    // Cross the 300 ms muscle-memory window deterministically, then confirm.
+    act(() => vi.advanceTimersByTime(DELETE_NO_COMMIT_WINDOW_MS))
+    fireEvent.click(within(row).getByRole('button', { name: 'Confirm' }))
+    vi.useRealTimers()
+
+    // A DELETE was issued for row 'a'.
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([u, i]) =>
+            (i as RequestInit | undefined)?.method === 'DELETE' &&
+            String(u).endsWith('/todos/a'),
+        ),
+      ).toBe(true),
+    )
+
+    // Honest-pending: the row stays visible marked Committing (aria-busy) until
+    // the backend confirms — it is NOT optimistically removed (Story 2.1).
+    await waitFor(() => expect(row).toHaveAttribute('aria-busy', 'true'))
+    expect(screen.getByText('delete me')).toBeInTheDocument()
+
+    // Release the DELETE → the settle invalidate refetch returns without the row.
+    act(() => releaseDelete?.())
+    await waitFor(() =>
+      expect(screen.queryByText('delete me')).not.toBeInTheDocument(),
+    )
+    // The sibling row is untouched.
+    expect(screen.getByText('keep me')).toBeInTheDocument()
   })
 })
