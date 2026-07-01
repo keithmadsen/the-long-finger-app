@@ -232,4 +232,15 @@ describe('deleteTodo (Story 2.1)', () => {
 
     await expect(deleteTodo(BODY.id)).rejects.toThrow(/500/)
   })
+
+  it('throws on an unexpected 2xx (only 204 confirms a delete) (review finding)', async () => {
+    // A backend regression returning 200 must NOT be silently accepted as a
+    // confirmed delete — the 204 contract is strict.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 })),
+    )
+
+    await expect(deleteTodo(BODY.id)).rejects.toThrow(/200/)
+  })
 })

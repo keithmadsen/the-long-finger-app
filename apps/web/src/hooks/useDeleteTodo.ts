@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { Todo } from '@tlf/contracts'
 
 import { deleteTodo as deleteTodoRequest } from '../api/todos'
 
@@ -33,10 +32,6 @@ interface DeleteVariables {
   id: string
 }
 
-interface DeleteContext {
-  previous: Todo[] | undefined
-}
-
 export function useDeleteTodo() {
   const queryClient = useQueryClient()
   const inFlightIdsRef = useRef<Set<string>>(new Set())
@@ -65,29 +60,28 @@ export function useDeleteTodo() {
     })
   }
 
-  const mutation = useMutation<void, Error, DeleteVariables, DeleteContext>({
+  const mutation = useMutation<void, Error, DeleteVariables>({
     mutationFn: ({ id }) => deleteTodoRequest(id),
 
     onMutate: async ({ id }) => {
-      // Stop any in-flight list refetch from racing our marker.
+      // Stop any in-flight list refetch from racing our marker. We do NOT write
+      // the cache — honest-pending shows the row as Committing, not gone (AC 3,
+      // UX-DR15) — so there is deliberately NO snapshot to roll back to.
       await queryClient.cancelQueries({ queryKey: ['todos'] })
-      // Snapshot for rollback. Do NOT remove the row — honest-pending shows it
-      // as Committing, not gone (AC 3, UX-DR15).
-      const previous = queryClient.getQueryData<Todo[]>(['todos'])
       addDeleting(id)
-      return { previous }
     },
 
-    onError: (_error, _variables, context) => {
-      // Restore the snapshot (rollback, AC 3). The item was never optimistically
-      // removed, so it is never silently lost (AC 4); the onSettled invalidate
-      // reconciles to backend truth.
-      queryClient.setQueryData(['todos'], context?.previous)
-    },
-
+    // No onError cache rollback (code-review finding): because onMutate never
+    // removed the row, there is nothing to restore, and blindly writing back a
+    // pre-mutation snapshot would be actively wrong under concurrency — a later
+    // failure could resurrect a sibling row that a parallel delete had already
+    // removed. The item is never silently lost (AC 4) precisely because it was
+    // never optimistically removed; the onSettled invalidate reconciles both
+    // paths to backend truth.
     onSettled: (_data, _error, { id }) => {
       removeDeleting(id)
-      // Unconditional reconcile (AC 3): success drops the row, error restores it.
+      // Unconditional reconcile (AC 3, 4): success drops the row, a failure
+      // leaves it — the refetch is the single source of truth either way.
       void queryClient.invalidateQueries({ queryKey: ['todos'] })
     },
   })

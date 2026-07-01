@@ -1,5 +1,8 @@
-import { Type } from '@sinclair/typebox'
-import { Value } from '@sinclair/typebox/value'
+// Named `Check` import (NOT the `Value` namespace facade) so Rollup tree-shakes
+// away the rest of the value module — cast/convert/clean/diff/patch/encode/decode
+// never reach the client bundle. Keeps the runtime-validation footprint small
+// (the bundle-size gate, Story 1.6 AC 9).
+import { Check } from '@sinclair/typebox/value'
 import { todoSchema, type Todo } from '@tlf/contracts'
 
 /*
@@ -11,7 +14,7 @@ import { todoSchema, type Todo } from '@tlf/contracts'
  *
  * We use `@sinclair/typebox/value` (NOT Ajv) on the client: no extra dependency,
  * browser-friendly, and it validates the exact same schema object the API
- * serializes against. `Value.Check` is the boolean gate; on a miss we throw a
+ * serializes against. `Check` is the boolean gate; on a miss we throw a
  * descriptive Error so callers keep the existing "throw → mutation onError /
  * query isError" contract with no behavior change.
  *
@@ -21,18 +24,19 @@ import { todoSchema, type Todo } from '@tlf/contracts'
  * `vitest run` (Story 2.1 Task C1).
  */
 
-const todoArraySchema = Type.Array(todoSchema)
-
 export function parseTodo(value: unknown): Todo {
-  if (!Value.Check(todoSchema, value)) {
+  if (!Check(todoSchema, value)) {
     throw new Error('Response body failed Todo contract validation')
   }
   return value
 }
 
+// Validate each element against `todoSchema` rather than building
+// `Type.Array(todoSchema)`, so the runtime never imports the `Type` builder's
+// array combinator solely for this check.
 export function parseTodoArray(value: unknown): Todo[] {
-  if (!Value.Check(todoArraySchema, value)) {
+  if (!Array.isArray(value) || !value.every((item) => Check(todoSchema, item))) {
     throw new Error('Response body failed Todo[] contract validation')
   }
-  return value
+  return value as Todo[]
 }

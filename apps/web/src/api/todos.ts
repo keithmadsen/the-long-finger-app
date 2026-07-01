@@ -107,14 +107,18 @@ export async function patchTodo(
  * Delete a todo (Story 2.1). DELETEs /todos/:id through the same Vite proxy.
  * This is the ONE wrapper with no @tlf/contracts representation: the endpoint
  * returns 204 with no body, so it parses no JSON and validates NOTHING — the
- * 204/no-schema asymmetry is intentional (AC 8). Throws on a non-OK response so
- * useDeleteTodo's onError fires (rollback + reconcile). The server is idempotent
+ * 204/no-schema asymmetry is intentional (AC 8). The server is idempotent
  * (204 even for an absent id), so a retry is always safe.
+ *
+ * Success is EXACTLY 204 — the contract's only success status. Any other
+ * response (a non-OK error OR an unexpected 2xx from a backend regression)
+ * throws, routing to useDeleteTodo's onError rather than silently accepting an
+ * unconfirmed delete (code-review hardening: the 204 contract is strict).
  */
 export async function deleteTodo(id: string): Promise<void> {
   const response = await fetch(`/todos/${id}`, { method: 'DELETE' })
 
-  if (!response.ok) {
+  if (response.status !== 204) {
     throw new Error(`DELETE /todos/${id} failed: ${response.status}`)
   }
 }

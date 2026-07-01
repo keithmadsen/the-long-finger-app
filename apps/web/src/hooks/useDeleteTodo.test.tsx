@@ -84,20 +84,28 @@ describe('useDeleteTodo (Story 2.1)', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['todos'] })
   })
 
-  it('on error restores the snapshot (row NOT removed) and still invalidates to reconcile (AC 4)', async () => {
+  it('on error does NOT write the cache (no stale full-snapshot rollback) but still invalidates to reconcile (AC 4, review finding)', async () => {
     const client = createTestQueryClient()
+    client.setQueryData<Todo[]>(['todos'], [
+      todo({ id: 'a', description: 'Buy milk' }),
+      todo({ id: 'b', description: 'sibling' }),
+    ])
+    // Spy AFTER seeding so the seed write is not counted.
+    const setSpy = vi.spyOn(client, 'setQueryData')
     const invalidateSpy = vi.spyOn(client, 'invalidateQueries')
-    client.setQueryData<Todo[]>(['todos'], [todo({ id: 'a', description: 'Buy milk' })])
     stubFetch({ getList: () => [], failIds: ['a'] })
 
     const { result } = setup(client)
     act(() => result.current.deleteTodo('a'))
 
     await waitFor(() => expect(result.current.deletingIds.has('a')).toBe(false))
-    // The item was never optimistically removed, so it is never silently lost.
+    // The hook never writes the cache — no optimistic remove means no rollback,
+    // so a stale snapshot can never resurrect a sibling a parallel delete removed.
+    expect(setSpy).not.toHaveBeenCalled()
+    // The row was never removed, so it is never silently lost (AC 4).
     const list = client.getQueryData<Todo[]>(['todos']) ?? []
     expect(list.map((t) => t.id)).toContain('a')
-    // Unconditional reconcile still fires on the error path (AC 3, 4).
+    // Reconciliation is the unconditional invalidate (AC 3, 4).
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['todos'] })
   })
 

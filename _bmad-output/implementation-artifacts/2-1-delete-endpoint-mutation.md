@@ -97,6 +97,11 @@ so that removal is durable, safe to retry, and consistent with the app's other m
 
 - [x] **Task E1:** Run the full suite. **API tests require Node 24** (`nvm use 24` first — better-sqlite3 ABI is built for it; the shell default is Node 22). `npm test` (or `npm run test:unit` + `npm run test:integration` for the API). Also run `npm run typecheck` and `npm run build` (the latter exercises the new runtime contracts import through Vite — Task C1's gotcha).
 
+### Review Findings
+
+- [x] [Review][Patch] Enforce DELETE wrapper's strict 204 contract [apps/web/src/api/todos.ts:115] — `deleteTodo()` treats any `response.ok` status as success. Story 2.1 defines the delete wrapper as the 204/no-body asymmetry, so a backend regression returning another 2xx response would be silently accepted as a confirmed delete. **Resolved:** the wrapper now throws unless `response.status === 204` (any non-OK OR unexpected 2xx routes to `onError`). New wrapper test covers the unexpected-200 case.
+- [x] [Review][Patch] Avoid stale full-cache rollback for concurrent delete failures [apps/web/src/hooks/useDeleteTodo.ts:81] — `onError` restores the entire pre-mutation `['todos']` snapshot even though `onMutate` never removes the row. With two row deletes in flight, a later failure can briefly restore a stale snapshot and reintroduce a sibling that already deleted successfully before the unconditional invalidate refetch reconciles. **Resolved:** removed the `onError` snapshot restore (and the now-dead snapshot/context) entirely — since `onMutate` makes no cache write there is nothing to roll back, and the unconditional `onSettled` invalidate is the sole reconciler on both paths. The hook test now asserts the hook never calls `setQueryData`.
+
 ## Dev Notes
 
 ### The delete honest-pending model — how it differs from create AND toggle
@@ -193,6 +198,7 @@ claude-opus-4-8[1m] (Claude Opus 4.8, 1M context) — bmad-dev-story workflow.
 ## Change Log
 
 - 2026-07-01: Implemented Story 2.1 (dev-story). API: idempotent DELETE `/todos/:id` (204, inline handler) + repository `deleteTodo`. Web: shared runtime contract validator replacing the `isTodo` guard, retrofit of `getTodos`/`createTodo`/`patchTodo`, `deleteTodo` wrapper, and the `useDeleteTodo` honest-pending hook. Added `@tlf/contracts` + `@sinclair/typebox` as web runtime deps. All 8 ACs satisfied; 187 tests + typecheck + build + lint green under Node 24. Status → review.
+- 2026-07-01: CI + review follow-ups. Bumped `actions/checkout`/`actions/setup-node` to `@v5` (Node 24-native action runtimes, clears the Node 20 deprecation warning). Rebaselined the ratcheting bundle-size gate to 90,780 B gz (Keith-approved: the ~14 KB is the intentional TypeBox runtime-validation cost). Resolved 2 code-review `[Patch]` findings: strict-204 delete wrapper, and removal of the stale `onError` cache rollback in `useDeleteTodo`. Web tests now 139 (added the unexpected-2xx wrapper test + the no-cache-write regression assertion).
 
 ## Previous Story Intelligence (Epic 1 → Epic 2 handoff)
 
