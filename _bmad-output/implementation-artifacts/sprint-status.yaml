@@ -96,6 +96,8 @@ project: the long finger
 # 2026-07-01: 2-2 → in-progress (dev-story)
 # 2026-07-01: 2-2 → review (dev-story complete)
 # 2026-07-01: 2-3 → ready-for-dev (create-story); roving tabindex + browser forced-colors/reduced-motion gates + axe/consolidated-SR + LiveRegion re-announce fix deferred to Epic 3
+# 2026-07-01: 2-3 → in-progress (dev-story)
+# 2026-07-01: 2-3 → review (dev-story complete); container rebuild + e2e delete verified against running image
 project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"
@@ -120,7 +122,7 @@ development_status:
   epic-2: in-progress
   2-1-delete-endpoint-mutation: done
   2-2-inline-two-step-delete-affordance: done
-  2-3-delete-accessibility-state-race-hardening: ready-for-dev
+  2-3-delete-accessibility-state-race-hardening: review
   epic-2-retrospective: optional
 
   # Epic 3: Production Readiness & Delivery

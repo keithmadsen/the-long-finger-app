@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from 'react'
+import { useLayoutEffect, useRef, type KeyboardEvent } from 'react'
 import type { Todo } from '@tlf/contracts'
 
 import { Button, Checkbox } from '../primitives'
@@ -100,6 +100,39 @@ export function TodoItem({
   // The affordance is inert while the row is create/toggle-pending (not yet a
   // stable server row) or already deleting (a second DELETE must not be invited).
   const showDeleteAffordance = Boolean(onDeletePress) && !pending && !deleting
+  // The toggle path is inert whenever the row is create/toggle-pending OR a DELETE
+  // is in flight (Committing). 2.2 only guarded `pending`, leaving a Committing row
+  // toggle-live — a keyboard Enter or checkbox change would race a PATCH against
+  // the in-flight DELETE (arch line 303: per-row delete-vs-toggle arbitration).
+  // `busy` closes that gap (Story 2.3 AC 6, Task D1).
+  const busy = pending || deleting
+
+  // The row <label> is the "row anchor" (already tabIndex={0}). Focus is relocated
+  // here when a commit unmounts the Confirm button (Task C2) and when Escape reverts
+  // an armed affordance (Task C1) — never stranded on a removed node (AC 3).
+  const rowAnchorRef = useRef<HTMLLabelElement>(null)
+
+  // A committed delete flips the row to `deleting` → showDeleteAffordance becomes
+  // false → the Confirm button unmounts. A keyboard (or click) commit therefore
+  // leaves document.activeElement on a removed node, which falls back to <body>.
+  // Relocate focus to the still-mounted row anchor so it is never stranded (AC 3).
+  // The `=== document.body` guard is load-bearing: we reclaim ONLY genuinely-
+  // stranded focus (the button unmounted from under the user), never focus the
+  // user has since placed elsewhere (e.g. a pointer commit where focus moved on).
+  // useLayoutEffect runs before paint, so focus never visibly lands on <body>.
+  // Scope boundary: when the onSettled refetch later drops the committing row, its
+  // anchor unmounts too — following focus onward to an ADJACENT row is roving-
+  // tabindex / Story 3.1, NOT this story. 2.3 only guarantees focus leaves the
+  // removed button and lands on the row anchor.
+  useLayoutEffect(() => {
+    if (
+      deleting &&
+      rowAnchorRef.current &&
+      document.activeElement === document.body
+    ) {
+      rowAnchorRef.current.focus()
+    }
+  }, [deleting])
 
   /*
    * Failed variant (Story 1.9). A DISTINCT internal branch (sanctioned by UX line
@@ -161,7 +194,7 @@ export function TodoItem({
     const rowHasFocus = event.target === event.currentTarget
     if (event.key !== 'Enter' && !(event.key === ' ' && rowHasFocus)) return
     event.preventDefault()
-    if (pending) return
+    if (busy) return
     onToggle?.(!checked)
   }
 
@@ -174,17 +207,18 @@ export function TodoItem({
        * new interactive surface.
        */}
       <label
-        aria-disabled={pending || undefined}
+        aria-disabled={busy || undefined}
         className={className}
         onKeyDown={handleKeyDown}
+        ref={rowAnchorRef}
         tabIndex={0}
       >
         <Checkbox
-          aria-disabled={pending || undefined}
+          aria-disabled={busy || undefined}
           aria-label={todo.description}
           checked={checked}
           onCheckedChange={(checked) => {
-            if (!pending) onToggle?.(checked)
+            if (!busy) onToggle?.(checked)
           }}
           rootAsLabel={false}
         />
@@ -203,11 +237,26 @@ export function TodoItem({
            *     without this stop. (Space is already gated by target===currentTarget.)
            * data-armed-delete is present only on the currently armed affordance, so
            * a pointerdown on another row's idle Delete is treated as tap-away before
-           * that row's click arms it. Blur reverts an armed row (Tab-away). The
-           * visible text IS the accessible name this story (Story 2.3 enriches it
-           * with aria-label + aria-pressed).
+           * that row's click arms it. Blur reverts an armed row (Tab-away).
+           *
+           * Accessibility (Story 2.3): the visible text stays `Delete`/`Confirm`, but
+           * aria-label overrides the accessible name for AT with the enriched copy
+           * (UX lines 766, 1416), and aria-pressed makes it a proper toggle button
+           * (false idle / true armed). Both are plain props spread onto the native
+           * <button> by the Button primitive (same mechanism data-failed-retry uses).
+           *
+           * onKeyDown keeps its load-bearing stopPropagation (the label's
+           * handleKeyDown toggles on Enter for ANY target) AND adds an Escape branch:
+           * revert to idle and return focus to the row anchor, not out of the list
+           * (UX lines 1396–1399). Only Escape is handled — other keys fall through.
            */
           <Button
+            aria-label={
+              armed
+                ? `Confirm deletion of '${todo.description}', press again within 5 seconds to delete`
+                : `Delete '${todo.description}'`
+            }
+            aria-pressed={armed}
             className={[styles.delete, armed ? styles.armed : null]
               .filter(Boolean)
               .join(' ')}
@@ -217,7 +266,13 @@ export function TodoItem({
               event.stopPropagation()
               onDeletePress?.()
             }}
-            onKeyDown={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              event.stopPropagation()
+              if (event.key === 'Escape') {
+                onDeleteCancel?.()
+                rowAnchorRef.current?.focus()
+              }
+            }}
           >
             {armed ? 'Confirm' : 'Delete'}
           </Button>

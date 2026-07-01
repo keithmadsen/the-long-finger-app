@@ -288,14 +288,33 @@ describe('TodoItem', () => {
     })
   })
 
-  describe('Delete affordance (Story 2.2)', () => {
-    it('renders an idle Delete affordance on an Active row; its accessible name is "Delete" (AC 1)', () => {
+  describe('Delete affordance (Story 2.2 + 2.3 a11y)', () => {
+    // Story 2.3 enriched the accessible name via aria-label (the visible text stays
+    // Delete/Confirm). These are the AT-facing names the button now exposes.
+    const IDLE_NAME = "Delete 'Buy milk'"
+    const ARMED_NAME =
+      "Confirm deletion of 'Buy milk', press again within 5 seconds to delete"
+
+    it('idle affordance: enriched accessible name + aria-pressed="false" (AC 1)', () => {
       render(<TodoItem onDeletePress={vi.fn()} todo={makeTodo()} />)
 
-      // The visible text IS the accessible name this story (2.3 enriches it).
-      expect(
-        screen.getByRole('button', { name: 'Delete' }),
-      ).toBeInTheDocument()
+      // aria-label overrides the accessible name; the visible text is still Delete.
+      const button = screen.getByRole('button', { name: IDLE_NAME })
+      expect(button).toBeInTheDocument()
+      expect(button).toHaveTextContent('Delete')
+      expect(button).toHaveAttribute('aria-pressed', 'false')
+    })
+
+    it('armed affordance: enriched Confirm accessible name + aria-pressed="true" (AC 1)', () => {
+      render(<TodoItem armed onDeletePress={vi.fn()} todo={makeTodo()} />)
+
+      const confirm = screen.getByRole('button', { name: ARMED_NAME })
+      expect(confirm).toBeInTheDocument()
+      expect(confirm).toHaveTextContent('Confirm')
+      expect(confirm).toHaveAttribute('aria-pressed', 'true')
+      // The idle enriched name is gone once armed.
+      expect(screen.queryByRole('button', { name: IDLE_NAME })).toBeNull()
+      expect(classNameOf(confirm)).toMatch(/armed/)
     })
 
     it('tapping Delete fires onDeletePress and does NOT toggle (pointer stopPropagation, AC 1)', async () => {
@@ -310,7 +329,7 @@ describe('TodoItem', () => {
         />,
       )
 
-      await user.click(screen.getByRole('button', { name: 'Delete' }))
+      await user.click(screen.getByRole('button', { name: IDLE_NAME }))
 
       expect(onDeletePress).toHaveBeenCalledTimes(1)
       expect(onToggle).not.toHaveBeenCalled()
@@ -319,7 +338,8 @@ describe('TodoItem', () => {
     it('Enter on the Delete button does NOT toggle (keyboard stopPropagation, AC 1)', async () => {
       // The regression-prone case: the label's handleKeyDown toggles on Enter for
       // ANY target, so without the button's onKeyDown stopPropagation, Enter would
-      // BOTH activate delete AND toggle completion.
+      // BOTH activate delete AND toggle completion. Story 2.3's added Escape branch
+      // must not regress this.
       const user = userEvent.setup()
       const onToggle = vi.fn()
       const onDeletePress = vi.fn()
@@ -331,7 +351,7 @@ describe('TodoItem', () => {
         />,
       )
 
-      screen.getByRole('button', { name: 'Delete' }).focus()
+      screen.getByRole('button', { name: IDLE_NAME }).focus()
       await user.keyboard('{Enter}')
 
       // Native button activation still fires the delete press…
@@ -340,13 +360,82 @@ describe('TodoItem', () => {
       expect(onToggle).not.toHaveBeenCalled()
     })
 
-    it('the armed prop swaps the label to Confirm and applies the armed class (AC 2)', () => {
-      render(<TodoItem armed onDeletePress={vi.fn()} todo={makeTodo()} />)
+    it('Escape reverts the armed affordance and returns focus to the row anchor (AC 3, Task C1)', async () => {
+      const user = userEvent.setup()
+      const onDeleteCancel = vi.fn()
+      render(
+        <TodoItem
+          armed
+          onDeleteCancel={onDeleteCancel}
+          onDeletePress={vi.fn()}
+          todo={makeTodo()}
+        />,
+      )
 
-      const confirm = screen.getByRole('button', { name: 'Confirm' })
-      expect(confirm).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
-      expect(classNameOf(confirm)).toMatch(/armed/)
+      const confirm = screen.getByRole('button', { name: ARMED_NAME })
+      confirm.focus()
+      expect(document.activeElement).toBe(confirm)
+
+      await user.keyboard('{Escape}')
+
+      // Escape reverts to idle AND lands focus on the row anchor, not out of the list.
+      expect(onDeleteCancel).toHaveBeenCalled()
+      expect(document.activeElement).toBe(
+        screen.getByText('Buy milk').closest('label'),
+      )
+    })
+
+    it('a committed delete never strands focus on the unmounting Confirm button (AC 3, Task C2)', () => {
+      const { rerender } = render(
+        <TodoItem
+          armed
+          onDeleteCancel={vi.fn()}
+          onDeletePress={vi.fn()}
+          todo={makeTodo()}
+        />,
+      )
+
+      // Focus the armed Confirm button as a keyboard commit would.
+      const confirm = screen.getByRole('button', { name: ARMED_NAME })
+      confirm.focus()
+      expect(document.activeElement).toBe(confirm)
+
+      // Commit flips the row to deleting → the Confirm button unmounts; focus would
+      // fall to <body>. The useLayoutEffect relocates it to the still-mounted anchor.
+      rerender(
+        <TodoItem
+          deleting
+          onDeleteCancel={vi.fn()}
+          onDeletePress={vi.fn()}
+          todo={makeTodo()}
+        />,
+      )
+
+      expect(screen.queryByRole('button', { name: ARMED_NAME })).toBeNull()
+      expect(document.activeElement).toBe(
+        screen.getByText('Buy milk').closest('label'),
+      )
+      expect(document.activeElement).not.toBe(document.body)
+    })
+
+    it('the armed cue is the visible label change (Delete→Confirm) with NO icon — forced-colors fallback (AC 4, Task E1)', () => {
+      const { rerender } = render(
+        <TodoItem onDeletePress={vi.fn()} todo={makeTodo()} />,
+      )
+
+      // Idle: the only content is the text "Delete" — no <svg>/icon element that a
+      // forced-colors override could blank out; the label change alone carries the cue.
+      const idle = screen.getByRole('button', { name: IDLE_NAME })
+      expect(idle).toHaveTextContent('Delete')
+      expect(idle.querySelector('svg')).toBeNull()
+
+      rerender(<TodoItem armed onDeletePress={vi.fn()} todo={makeTodo()} />)
+
+      // Armed: the cue is the text flip to "Confirm" (survives forced-colors where
+      // --color-error is overridden) — again with no icon.
+      const armed = screen.getByRole('button', { name: ARMED_NAME })
+      expect(armed).toHaveTextContent('Confirm')
+      expect(armed.querySelector('svg')).toBeNull()
     })
 
     it('a deleting (Committing) row is aria-busy from t=0 and invites no delete press (AC 8)', () => {
@@ -354,15 +443,43 @@ describe('TodoItem', () => {
 
       // Busy immediately — the semantic never waits on the visual delay.
       expect(screen.getByRole('listitem')).toHaveAttribute('aria-busy', 'true')
-      // The affordance is inert while the DELETE is in flight.
-      expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
-      expect(screen.queryByRole('button', { name: 'Confirm' })).toBeNull()
+      // The affordance is inert while the DELETE is in flight (no button at all).
+      expect(screen.queryByRole('button')).toBeNull()
+    })
+
+    it('a Committing row is inert to the toggle path (AC 6, Task D1)', async () => {
+      // The 2.2 gap: a row with a DELETE in flight (deleting, not pending) was
+      // aria-busy but still toggle-live. 2.3 makes pending||deleting the inert
+      // condition so a keyboard Enter or checkbox change cannot race a PATCH.
+      const user = userEvent.setup()
+      const onToggle = vi.fn()
+      render(
+        <TodoItem
+          deleting
+          onDeletePress={vi.fn()}
+          onToggle={onToggle}
+          todo={makeTodo()}
+        />,
+      )
+
+      const label = screen.getByText('Buy milk').closest('label')
+      const checkbox = screen.getByRole('checkbox', { name: 'Buy milk' })
+      // The toggle surfaces carry aria-disabled while committing.
+      expect(label).toHaveAttribute('aria-disabled', 'true')
+      expect(checkbox).toHaveAttribute('aria-disabled', 'true')
+
+      label?.focus()
+      await user.keyboard('{Enter}')
+      await user.keyboard(' ')
+      await user.click(checkbox)
+
+      expect(onToggle).not.toHaveBeenCalled()
     })
 
     it('renders no delete affordance on a pending row (not yet a stable server row)', () => {
       render(<TodoItem onDeletePress={vi.fn()} pending todo={makeTodo()} />)
 
-      expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+      expect(screen.queryByRole('button', { name: IDLE_NAME })).toBeNull()
     })
 
     it('renders no delete affordance on a failed row (Retry/Dismiss only)', () => {
@@ -376,7 +493,7 @@ describe('TodoItem', () => {
         />,
       )
 
-      expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull()
+      expect(screen.queryByRole('button', { name: IDLE_NAME })).toBeNull()
       expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument()
     })

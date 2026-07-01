@@ -56,6 +56,7 @@ function setup() {
     advance: (ms: number) => act(() => fake.advance(ms)),
     press: (id: string) => act(() => view.result.current.press(id)),
     cancel: () => act(() => view.result.current.cancel()),
+    unmount: () => act(() => view.unmount()),
   }
 }
 
@@ -157,5 +158,78 @@ describe('useArmedDelete', () => {
     advance(DELETE_AUTO_REVERT_MS)
     expect(result.current.armedId).toBeNull()
     expect(onCommit).not.toHaveBeenCalled()
+  })
+
+  // Story 2.3 (AC 6): the three named delete state-machine races, driven
+  // deterministically by the injectable clock (never vi.useFakeTimers).
+  describe('state-race hardening (Story 2.3 AC 6)', () => {
+    it('Race 1 — a delete fired during the 300 ms no-commit window is absorbed, and the row stays committable after', () => {
+      const { result, press, advance, onCommit } = setup()
+
+      press('a') // t=0, arm
+      advance(DELETE_NO_COMMIT_WINDOW_MS - 1) // t=299, still inside the window
+      press('a') // absorbed (muscle memory), NOT committed
+
+      expect(onCommit).not.toHaveBeenCalled()
+      expect(result.current.armedId).toBe('a') // arm survives the absorbed press
+
+      // Advancing the rest of the window does not lose the arm (still < 5 s).
+      advance(1) // t=300
+      expect(result.current.armedId).toBe('a')
+
+      // A later press now past the window commits exactly once.
+      press('a')
+      expect(onCommit).toHaveBeenCalledTimes(1)
+      expect(onCommit).toHaveBeenCalledWith('a')
+      expect(result.current.armedId).toBeNull()
+    })
+
+    it('Race 2a — a commit just under the 5 s revert commits once and clears the revert (no stale double-action)', () => {
+      const { result, press, advance, onCommit } = setup()
+
+      press('a') // t=0
+      advance(DELETE_AUTO_REVERT_MS - 1) // t=4999, past 300 ms, just under revert
+      press('a') // commits
+
+      expect(onCommit).toHaveBeenCalledTimes(1)
+      expect(result.current.armedId).toBeNull()
+
+      // Advancing past the original 5 s must NOT fire a stale revert (the commit
+      // cleared the timer) — no double action, armedId stays null.
+      advance(DELETE_AUTO_REVERT_MS)
+      expect(onCommit).toHaveBeenCalledTimes(1)
+      expect(result.current.armedId).toBeNull()
+    })
+
+    it('Race 2b — if the 5 s revert wins, the row reverts and a later press RE-ARMS (does not commit)', () => {
+      const { result, press, advance, onCommit } = setup()
+
+      press('a') // t=0
+      advance(DELETE_AUTO_REVERT_MS) // t=5000 — revert fires first
+      expect(result.current.armedId).toBeNull()
+      expect(onCommit).not.toHaveBeenCalled()
+
+      // A subsequent press re-arms from idle rather than committing — the boundary
+      // is unambiguous.
+      press('a')
+      expect(result.current.armedId).toBe('a')
+      expect(onCommit).not.toHaveBeenCalled()
+    })
+
+    it('Race 3 — a refresh/navigation mid-window (unmount while armed) commits nothing and fires no stray revert', () => {
+      const { result, press, advance, unmount, onCommit } = setup()
+
+      press('a') // arm, before the 5 s revert
+      expect(result.current.armedId).toBe('a')
+
+      // Unmount is the deterministic proxy for the tab refreshing/navigating away
+      // while a row is armed. The cleanup effect clears the outstanding revert timer.
+      unmount()
+
+      // Advancing past the original revert floor fires no stray callback: no commit,
+      // and (crucially) no leaked timer resurrecting a revert on an unmounted hook.
+      advance(DELETE_AUTO_REVERT_MS)
+      expect(onCommit).not.toHaveBeenCalled()
+    })
   })
 })

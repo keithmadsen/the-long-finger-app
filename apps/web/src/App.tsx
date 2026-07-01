@@ -54,8 +54,9 @@ const FAILED_CREATE_HELP_TEXT =
  * create/toggle, so its in-flight `deletingIds` reach the list and drive each
  * row's Committing/aria-busy presentation). <TodoList> owns the armed-state
  * (arm-then-confirm) coordination via useArmedDelete; App only supplies onDelete
- * + deletingIds. Deletion announcements + aria-pressed are Story 2.3 — no announce
- * is passed here.
+ * + deletingIds. Story 2.3 wires the deletion announcements: App passes
+ * `announce` to useDeleteTodo exactly like create/toggle (aria-pressed lives on
+ * the row's delete affordance, not here).
  */
 function App() {
   const { data, isPending, isError, refetch } = useTodos()
@@ -112,8 +113,10 @@ function App() {
   // The delete mutation is owned HERE too (Story 2.2). `deletingIds` (the
   // Committing marker from 2.1's honest-pending onMutate) reaches the list so
   // each row can render aria-busy + the committing fade. The armed-state timing
-  // lives in <TodoList>'s useArmedDelete, not here.
-  const { deleteTodo, deletingIds } = useDeleteTodo()
+  // lives in <TodoList>'s useArmedDelete, not here. Story 2.3 passes the single
+  // App-owned `announce` so delete emits its success/failure announcements
+  // exactly like create/toggle (one LiveRegion only, UX-DR6/7).
+  const { deleteTodo, deletingIds } = useDeleteTodo({ announce })
 
   // Reactive <title> (AC 7): "the long finger (N active)", count omitted at zero.
   useEffect(() => {
