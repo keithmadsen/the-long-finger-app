@@ -20,9 +20,17 @@
     "lint:css:selftest": "npm run lint:css:selftest --workspace apps/web",
     "test": "npm run test --workspaces --if-present",
     "test:unit": "npm run test:unit --workspace apps/api",
-    "test:integration": "npm run test:integration --workspace apps/api"
+    "test:integration": "npm run test:integration --workspace apps/api",
+    "test:e2e": "playwright test",
+    "test:e2e:p0": "playwright test --grep @p0",
+    "test:e2e:p1": "playwright test --grep \"@p0|@p1\"",
+    "test:e2e:report": "playwright show-report"
   },
   "devDependencies": {
-    "npm-run-all": "^4.1.5"
+    "@faker-js/faker": "^10.5.0",
+    "@playwright/test": "^1.61.1",
+    "@seontechnologies/playwright-utils": "^4.4.0",
+    "npm-run-all": "^4.1.5",
+    "uuid": "^14.0.1"
   }
 }

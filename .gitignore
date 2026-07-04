@@ -8,6 +8,11 @@ _bmad/
 # Playwright MCP scratch output (page snapshots from browser verification)
 .playwright-mcp/
 
+# Playwright E2E harness artifacts
+/test-results/
+/playwright-report/
+/e2e/.auth/
+
 # Logs
 *.log
 
