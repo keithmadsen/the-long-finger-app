@@ -41,6 +41,16 @@ export interface TodoItemProps {
   onDeletePress?: () => void
   /** Revert the armed affordance to idle (wired to the button's blur). */
   onDeleteCancel?: () => void
+  /**
+   * Roving tabindex for the row anchor (Story 3.1): 0 on the single anchored
+   * row, -1 everywhere else — driven by <TodoList>'s useRovingTabindex. Defaults
+   * to 0 so a standalone row stays keyboard-reachable.
+   */
+  anchorTabIndex?: 0 | -1
+  /** Syncs the list's roving anchor when focus enters this row by other means (click). */
+  onAnchorFocus?: () => void
+  /** Registers the row-anchor <label> in the list's roving focus-target map. */
+  registerAnchor?: (node: HTMLLabelElement | null) => void
 }
 
 /*
@@ -90,6 +100,9 @@ export function TodoItem({
   deleting = false,
   onDeletePress,
   onDeleteCancel,
+  anchorTabIndex = 0,
+  onAnchorFocus,
+  registerAnchor,
 }: TodoItemProps) {
   // The delete row is another honest-pending consumer (Story 2.2): a Committing
   // (deleting) row is busy from t=0 and dims once past the flicker threshold, the
@@ -107,9 +120,10 @@ export function TodoItem({
   // `busy` closes that gap (Story 2.3 AC 6, Task D1).
   const busy = pending || deleting
 
-  // The row <label> is the "row anchor" (already tabIndex={0}). Focus is relocated
-  // here when a commit unmounts the Confirm button (Task C2) and when Escape reverts
-  // an armed affordance (Task C1) — never stranded on a removed node (AC 3).
+  // The row <label> is the "row anchor". Its tabIndex is roving (Story 3.1):
+  // <TodoList> drives 0/-1 via anchorTabIndex. Focus is relocated here when a
+  // commit unmounts the Confirm button (Task C2) and when Escape reverts an
+  // armed affordance (Task C1) — never stranded on a removed node (AC 3).
   const rowAnchorRef = useRef<HTMLLabelElement>(null)
 
   // A committed delete flips the row to `deleting` → showDeleteAffordance becomes
@@ -209,10 +223,21 @@ export function TodoItem({
       <label
         aria-disabled={busy || undefined}
         className={className}
+        onFocus={onAnchorFocus}
         onKeyDown={handleKeyDown}
-        ref={rowAnchorRef}
-        tabIndex={0}
+        ref={(node) => {
+          // One node, two consumers: the local 2.3 Escape/commit-focus paths and
+          // the list's roving focus-target map (Story 3.1).
+          rowAnchorRef.current = node
+          registerAnchor?.(node)
+        }}
+        tabIndex={anchorTabIndex}
       >
+        {/*
+         * tabIndex={-1} (Story 3.1, B3): the checkbox input leaves the page Tab
+         * sequence — Space/Enter on the row anchor is the keyboard toggle path.
+         * It stays click-operable and SR-reachable via the wrapping label.
+         */}
         <Checkbox
           aria-disabled={busy || undefined}
           aria-label={todo.description}
@@ -221,6 +246,7 @@ export function TodoItem({
             if (!busy) onToggle?.(checked)
           }}
           rootAsLabel={false}
+          tabIndex={-1}
         />
         <span className={styles.description}>{todo.description}</span>
         {showDeleteAffordance && (
@@ -273,6 +299,13 @@ export function TodoItem({
                 rowAnchorRef.current?.focus()
               }
             }}
+            /*
+             * Roving delete reachability (Story 3.1, B3): tabbable ONLY on the
+             * anchored row — Tab from the anchor reaches THAT row's Delete/
+             * Confirm, then exits the list (the spec's failed-row Tab-through
+             * pattern, UX line 1390). Every other row contributes zero tab stops.
+             */
+            tabIndex={anchorTabIndex === 0 ? 0 : -1}
           >
             {armed ? 'Confirm' : 'Delete'}
           </Button>

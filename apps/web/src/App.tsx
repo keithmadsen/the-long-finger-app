@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LiveRegion } from './components/primitives'
 import type { LiveRegionHandle } from './components/primitives'
 import { CaptureInput } from './components/recipes/CaptureInput'
+import type { CaptureInputHandle } from './components/recipes/CaptureInput'
 import { EmptyState } from './components/recipes/EmptyState'
 import { TodoList } from './components/recipes/TodoList'
 import { UnreadErrorIndicator } from './components/recipes/UnreadErrorIndicator'
@@ -57,10 +58,18 @@ const FAILED_CREATE_HELP_TEXT =
  * + deletingIds. Story 2.3 wires the deletion announcements: App passes
  * `announce` to useDeleteTodo exactly like create/toggle (aria-pressed lives on
  * the row's delete affordance, not here).
+ *
+ * Story 3.1 wires the Escape return path: the CaptureInput focus() handle is
+ * passed to <TodoList> as onListEscape (Escape on a row anchor → input; also the
+ * stranded-focus fallback when a delete empties the list). App itself adds NO
+ * global keydown handler — Cmd/Ctrl+Z stays unbound (NG-6).
  */
 function App() {
   const { data, isPending, isError, refetch } = useTodos()
   const liveRegionRef = useRef<LiveRegionHandle>(null)
+  // Escape from a row anchor returns focus HERE (Story 3.1 AC 5) — the single
+  // return-to-input affordance (the UX spec rejected `/` and Cmd+K shortcuts).
+  const captureRef = useRef<CaptureInputHandle>(null)
   // Guards the announce-once rule: announce when the query enters isError, and
   // never re-announce the same error. Reset on recovery so a *later* failure
   // announces again (UX-DR19).
@@ -70,6 +79,12 @@ function App() {
   // for the confirmation announcement (AC 9) and used for the load failure.
   const announce = useCallback((message: string) => {
     liveRegionRef.current?.announce(message)
+  }, [])
+
+  // Stable focus-the-input callback for the list's Escape / emptied-list
+  // fallback (Story 3.1) — mirrors the announce() shape over LiveRegion.
+  const focusCapture = useCallback(() => {
+    captureRef.current?.focus()
   }, [])
 
   // "Has this session ever observed/created a task?" Drives the instruction-line
@@ -285,7 +300,7 @@ function App() {
              * focus during burst capture.
              */}
             <div className={styles['capture-row']}>
-              <CaptureInput onSubmit={submit} />
+              <CaptureInput ref={captureRef} onSubmit={submit} />
               {showIndicator && (
                 <UnreadErrorIndicator
                   count={failedCount}
@@ -339,6 +354,7 @@ function App() {
         failedIds={failedIds}
         onDelete={deleteTodo}
         onDismiss={dismiss}
+        onListEscape={focusCapture}
         onRetry={retry}
         onToggle={toggle}
         pendingIds={pendingIds}

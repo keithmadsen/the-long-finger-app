@@ -134,4 +134,109 @@ describe('TodoList', () => {
       expect(screen.getAllByRole('button', { name: /^Delete '/ })).toHaveLength(2)
     })
   })
+
+  describe('roving tabindex (Story 3.1)', () => {
+    // The row anchor is the wrapping <label> (the committed anchor since 1.6→2.3).
+    function anchors(): HTMLLabelElement[] {
+      return screen
+        .getAllByRole('listitem')
+        .map((item) => item.querySelector('label'))
+        .filter((label): label is HTMLLabelElement => label !== null)
+    }
+
+    const THREE: Todo[] = [
+      ...TODOS,
+      {
+        id: 'c',
+        description: 'render me third',
+        completed: false,
+        createdAt: '2026-06-19T08:00:00.000Z',
+        updatedAt: '2026-06-19T08:00:00.000Z',
+      },
+    ]
+
+    it('exactly ONE row anchor is tabindex="0" (the first row), the rest -1 (AC 1)', () => {
+      render(<TodoList todos={THREE} />)
+
+      expect(anchors().map((a) => a.tabIndex)).toEqual([0, -1, -1])
+    })
+
+    it('ArrowDown / ArrowUp move focus between anchors and clamp at the ends (AC 3)', async () => {
+      const user = userEvent.setup()
+      render(<TodoList todos={THREE} />)
+      const [first, second, third] = anchors()
+
+      first!.focus()
+      await user.keyboard('{ArrowUp}') // clamp at the top — no wrap
+      expect(first).toHaveFocus()
+
+      await user.keyboard('{ArrowDown}')
+      expect(second).toHaveFocus()
+      expect(anchors().map((a) => a.tabIndex)).toEqual([-1, 0, -1])
+
+      await user.keyboard('{ArrowDown}')
+      expect(third).toHaveFocus()
+      await user.keyboard('{ArrowDown}') // clamp at the bottom — no wrap
+      expect(third).toHaveFocus()
+
+      await user.keyboard('{ArrowUp}')
+      expect(second).toHaveFocus()
+    })
+
+    it('Home / End move focus to the first / last anchor (AC 3)', async () => {
+      const user = userEvent.setup()
+      render(<TodoList todos={THREE} />)
+      const [first, , third] = anchors()
+
+      first!.focus()
+      await user.keyboard('{End}')
+      expect(third).toHaveFocus()
+
+      await user.keyboard('{Home}')
+      expect(first).toHaveFocus()
+    })
+
+    it('a toggle-reorder keeps focus and the anchor on the SAME row (id-keyed, AC 4)', async () => {
+      const user = userEvent.setup()
+      const { rerender } = render(<TodoList todos={TODOS} />)
+
+      // Move the anchor to row 'a' (rendered second).
+      anchors()[0]!.focus()
+      await user.keyboard('{ArrowDown}')
+      const anchorOfA = anchors()[1]!
+      expect(anchorOfA).toHaveFocus()
+
+      // The canonical order re-sorts: 'a' now renders FIRST. key={todo.id}
+      // preserves the DOM node, so focus and the roving 0 travel with it.
+      rerender(<TodoList todos={[TODOS[1]!, TODOS[0]!]} />)
+
+      expect(anchorOfA).toHaveFocus()
+      expect(anchorOfA).toBe(anchors()[0])
+      expect(anchors().map((a) => a.tabIndex)).toEqual([0, -1])
+    })
+
+    it('checkbox inputs are OUT of the tab sequence; delete is tabbable only on the anchor row (B3)', () => {
+      render(<TodoList onDelete={vi.fn()} todos={TODOS} />)
+
+      for (const checkbox of screen.getAllByRole('checkbox')) {
+        expect(checkbox).toHaveAttribute('tabindex', '-1')
+      }
+      const deleteButtons = screen.getAllByRole('button', { name: /^Delete '/ })
+      expect(deleteButtons.map((b) => b.tabIndex)).toEqual([0, -1])
+    })
+
+    it('modified arrows (Cmd/Ctrl/Alt) do not move the anchor — shortcuts pass through (AC 6)', async () => {
+      const user = userEvent.setup()
+      render(<TodoList todos={TODOS} />)
+      const [first] = anchors()
+
+      first!.focus()
+      await user.keyboard('{Meta>}{ArrowDown}{/Meta}')
+      await user.keyboard('{Control>}{ArrowDown}{/Control}')
+      await user.keyboard('{Alt>}{ArrowDown}{/Alt}')
+
+      expect(first).toHaveFocus()
+      expect(anchors().map((a) => a.tabIndex)).toEqual([0, -1])
+    })
+  })
 })

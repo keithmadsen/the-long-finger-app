@@ -212,6 +212,112 @@ describe('TodoItem', () => {
       expect(row).toBeInTheDocument()
       expect(row?.querySelector('label')).toBeNull()
     })
+
+    it('no rendered variant nests a <label> inside the row label (Story 3.1 Task E1 — fixed since 1.8 via rootAsLabel={false})', () => {
+      // Every variant that renders the row <label>: Active, Complete, Pending,
+      // ArmedDelete, Committing. (Failed renders a <div> with no checkbox at all.)
+      const variants: Array<Parameters<typeof TodoItem>[0]> = [
+        { todo: makeTodo({ completed: false }) },
+        { todo: makeTodo({ completed: true }) },
+        { todo: makeTodo(), pending: true },
+        { todo: makeTodo(), armed: true, onDeletePress: vi.fn() },
+        { todo: makeTodo(), deleting: true },
+      ]
+
+      for (const props of variants) {
+        const { unmount } = render(<TodoItem {...props} />)
+        const row = screen.getByText('Buy milk').closest('label')
+        expect(row).toBeInTheDocument()
+        expect(row?.querySelector('label')).toBeNull()
+        unmount()
+      }
+    })
+  })
+
+  describe('roving anchor wiring (Story 3.1)', () => {
+    it('the row anchor tabIndex is prop-driven: 0 when anchored, -1 otherwise, default 0 (AC 1)', () => {
+      const { rerender } = render(
+        <TodoItem anchorTabIndex={0} todo={makeTodo()} />,
+      )
+      const row = () => screen.getByText('Buy milk').closest('label')
+      expect(row()).toHaveAttribute('tabindex', '0')
+
+      rerender(<TodoItem anchorTabIndex={-1} todo={makeTodo()} />)
+      expect(row()).toHaveAttribute('tabindex', '-1')
+
+      // Standalone default keeps the row keyboard-reachable.
+      rerender(<TodoItem todo={makeTodo()} />)
+      expect(row()).toHaveAttribute('tabindex', '0')
+    })
+
+    it('the checkbox input is always out of the page Tab sequence but stays click-operable (B3)', async () => {
+      const user = userEvent.setup()
+      const onToggle = vi.fn()
+      render(
+        <TodoItem anchorTabIndex={-1} onToggle={onToggle} todo={makeTodo()} />,
+      )
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Buy milk' })
+      expect(checkbox).toHaveAttribute('tabindex', '-1')
+
+      await user.click(checkbox)
+      expect(onToggle).toHaveBeenCalledTimes(1)
+    })
+
+    it('the delete affordance is tabbable ONLY on the anchored row (B3)', () => {
+      const { rerender } = render(
+        <TodoItem anchorTabIndex={0} onDeletePress={vi.fn()} todo={makeTodo()} />,
+      )
+      expect(screen.getByRole('button', { name: /^Delete '/ })).toHaveAttribute(
+        'tabindex',
+        '0',
+      )
+
+      rerender(
+        <TodoItem
+          anchorTabIndex={-1}
+          onDeletePress={vi.fn()}
+          todo={makeTodo()}
+        />,
+      )
+      expect(screen.getByRole('button', { name: /^Delete '/ })).toHaveAttribute(
+        'tabindex',
+        '-1',
+      )
+    })
+
+    it('focus arriving anywhere in the row fires onAnchorFocus (click-sync path)', () => {
+      const onAnchorFocus = vi.fn()
+      render(
+        <TodoItem
+          onAnchorFocus={onAnchorFocus}
+          onDeletePress={vi.fn()}
+          todo={makeTodo()}
+        />,
+      )
+
+      // Direct anchor focus…
+      screen.getByText('Buy milk').closest('label')?.focus()
+      expect(onAnchorFocus).toHaveBeenCalledTimes(1)
+
+      // …and focus on an inner control bubbles to the label (focusin).
+      screen.getByRole('button', { name: /^Delete '/ }).focus()
+      expect(onAnchorFocus).toHaveBeenCalledTimes(2)
+    })
+
+    it('registerAnchor receives the row anchor node (list focus-target map)', () => {
+      const registerAnchor = vi.fn()
+      const { unmount } = render(
+        <TodoItem registerAnchor={registerAnchor} todo={makeTodo()} />,
+      )
+
+      expect(registerAnchor).toHaveBeenCalledWith(
+        screen.getByText('Buy milk').closest('label'),
+      )
+
+      unmount()
+      expect(registerAnchor).toHaveBeenLastCalledWith(null)
+    })
   })
 
   describe('Failed variant (Story 1.9)', () => {

@@ -1,7 +1,9 @@
+import { useMemo } from 'react'
 import type { Todo } from '@tlf/contracts'
 
 import { TodoItem } from './TodoItem'
 import { useArmedDelete } from '../../hooks/useArmedDelete'
+import { useRovingTabindex } from '../../hooks/useRovingTabindex'
 import styles from './TodoList.module.css'
 
 export interface TodoListProps {
@@ -24,6 +26,12 @@ export interface TodoListProps {
   onDelete?: (id: string) => void
   /** Ids whose DELETE is in flight — each maps to a Committing <TodoItem> (2.1). */
   deletingIds?: ReadonlySet<string>
+  /**
+   * Return focus to the capture input (Story 3.1): Escape on a row anchor, and
+   * the stranded-focus fallback when a delete empties the list. Wired by App to
+   * the CaptureInput focus() handle.
+   */
+  onListEscape?: () => void
 }
 
 /*
@@ -31,11 +39,15 @@ export interface TodoListProps {
  * ORDER RECEIVED — the backend (completed ASC, updated_at DESC) is the single
  * canonical-order authority and the frontend never re-sorts (AC 8).
  *
- * No roving-tabindex yet (Epic 3 / UX-DR24). Armed-delete coordination (Epic 2 /
- * UX-DR-delete) lives HERE (epics AC 5, "coordination owned by <TodoList>"): the
- * useArmedDelete state machine enforces the single-armed invariant across rows
- * and drives each row's `armed` prop. The hybrid in-place vs. reorder session
- * rule (UX-DR17) is unchanged.
+ * Roving tabindex (Story 3.1 / UX-DR24): useRovingTabindex keeps exactly one
+ * row anchor in the page tab sequence and moves focus on Arrow/Home/End via the
+ * container keydown attached to the <ul>. Only NORMAL rows are navigable —
+ * failed rows have no anchor and keep their natively-tabbable Retry/Dismiss
+ * (UX line 1390). Armed-delete coordination (Epic 2 / UX-DR-delete) lives HERE
+ * (epics AC 5, "coordination owned by <TodoList>"): the useArmedDelete state
+ * machine enforces the single-armed invariant across rows and drives each row's
+ * `armed` prop. The hybrid in-place vs. reorder session rule (UX-DR17) is
+ * unchanged.
  *
  * <ul> already carries the list role; the explicit role="list" guards against
  * the list-role being stripped when list-style is removed in some browsers.
@@ -51,6 +63,7 @@ export function TodoList({
   describedById,
   onDelete,
   deletingIds,
+  onListEscape,
 }: TodoListProps) {
   // The single-armed arm-then-confirm state machine (AC 5). A confirmed press
   // calls back into App's delete mutation. The 300 ms / 5 s timers run on the
@@ -59,20 +72,42 @@ export function TodoList({
     onCommit: (id) => onDelete?.(id),
   })
 
+  // The navigable ids, in render order (derivative of query order — never
+  // re-sorted). Failed rows are excluded: they render no row anchor (Story 3.1).
+  const navigableIds = useMemo(
+    () =>
+      todos
+        .filter((todo) => !(failedIds?.has(todo.id) ?? false))
+        .map((todo) => todo.id),
+    [todos, failedIds],
+  )
+
+  // List-wide keyboard navigation (Story 3.1): the roving-anchor coordinator.
+  // Its container keydown binds NOTHING with a modifier — Cmd/Ctrl+Z and every
+  // other browser/OS shortcut pass through untouched (AC 6 / NG-6; see the undo
+  // contract comment inside useRovingTabindex).
+  const { getAnchorProps, containerProps } = useRovingTabindex({
+    ids: navigableIds,
+    onEscape: onListEscape,
+  })
+
   return (
-    <ul className={styles.list} role="list">
+    <ul className={styles.list} role="list" {...containerProps}>
       {todos.map((todo) => {
         // A failed row is rendered as the Failed variant and is NEVER also
         // treated as pending/toggling (it has no in-flight create or server item).
         const isFailed = failedIds?.has(todo.id) ?? false
         const canDelete = !isFailed && onDelete !== undefined
+        const roving = isFailed ? undefined : getAnchorProps(todo.id)
         return (
           <TodoItem
             key={todo.id}
+            anchorTabIndex={roving?.tabIndex}
             armed={armedId === todo.id}
             deleting={deletingIds?.has(todo.id) ?? false}
             describedById={describedById}
             failed={isFailed}
+            onAnchorFocus={roving?.onFocus}
             onDeleteCancel={cancel}
             onDeletePress={canDelete ? () => press(todo.id) : undefined}
             onDismiss={() => onDismiss?.(todo.id)}
@@ -84,6 +119,7 @@ export function TodoList({
               ((pendingIds?.has(todo.id) ?? false) ||
                 togglingCompletedById?.[todo.id] !== undefined)
             }
+            registerAnchor={roving?.ref}
             todo={todo}
           />
         )
