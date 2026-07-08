@@ -1,8 +1,10 @@
+import { createRef } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { CaptureInput } from './CaptureInput'
+import type { CaptureInputHandle } from './CaptureInput'
 
 const PLACEHOLDER = 'What do you want to do?'
 
@@ -53,6 +55,45 @@ describe('CaptureInput', () => {
     await user.clear(input)
     await user.keyboard('{Enter}')
     expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('Escape with text clears the draft, keeps focus, and does NOT submit (Story 3.1 AC 5)', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(<CaptureInput onSubmit={onSubmit} />)
+    const input = getInput()
+
+    await user.type(input, 'half-typed thought')
+    await user.keyboard('{Escape}')
+
+    expect(input.value).toBe('')
+    expect(document.activeElement).toBe(input)
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('Escape on an EMPTY input is a no-op — the event passes through unprevented (Story 3.1 AC 5)', () => {
+    render(<CaptureInput onSubmit={vi.fn()} />)
+    const input = getInput()
+
+    // fireEvent returns false when a handler called preventDefault — the empty
+    // field must let Escape pass untouched (no app handler claims it).
+    const passedThrough = fireEvent.keyDown(input, { key: 'Escape' })
+
+    expect(passedThrough).toBe(true)
+    expect(input.value).toBe('')
+    expect(document.activeElement).toBe(input)
+  })
+
+  it('exposes a focus() handle that focuses the input (Story 3.1, row-Escape return path)', () => {
+    const ref = createRef<CaptureInputHandle>()
+    render(<CaptureInput onSubmit={vi.fn()} ref={ref} />)
+    const input = getInput()
+
+    input.blur()
+    expect(document.activeElement).not.toBe(input)
+
+    ref.current?.focus()
+    expect(document.activeElement).toBe(input)
   })
 
   it('hides the counter below 180 chars and shows N/200 at/above the threshold (AC 3)', () => {

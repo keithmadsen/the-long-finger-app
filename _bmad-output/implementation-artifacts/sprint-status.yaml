@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-16
-last_updated: 2026-07-05  # 3-1 → ready-for-dev (create-story)
+last_updated: 2026-07-06  # 3-1 → review (dev-story complete)
 # 2026-07-01: 2-2 dev-story complete
 # 2026-07-01: 2-1 → in-progress (dev-story)
 # 2026-07-01: 2-1 → review (dev-story complete)
@@ -103,6 +103,8 @@ project: the long finger
 # 2026-07-01: epic-2-retrospective → done; committed Playwright e2e harness (Epic 1 item 6) NOT delivered — carried to Epic 3 (Story 3.4, prereq for 3.3)
 # 2026-07-04: Playwright e2e harness stood up via testarch-framework (PR #20) — 4 sample specs green; CI e2e job remains Story 3.4
 # 2026-07-05: epic-3 → in-progress, 3-1 → ready-for-dev (create-story); adjacent-row focus-follow (2.3 handoff) + nested-label decision record folded in; delete-reachability default = anchored-row Tab stop
+# 2026-07-05: 3-1 → in-progress (dev-story)
+# 2026-07-06: 3-1 → review (dev-story complete); nested-label deferred item closed; bundle ratchet rebaselined 91505→92295 B gz
 project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"
@@ -132,7 +134,7 @@ development_status:
 
   # Epic 3: Production Readiness & Delivery
   epic-3: in-progress
-  3-1-list-wide-keyboard-navigation: ready-for-dev
+  3-1-list-wide-keyboard-navigation: review
   3-2-consolidated-screen-reader-contract: backlog
   3-3-responsive-forced-colors-reduced-motion-verification: backlog
   3-4-expanded-ci-quality-gates-wcag-conformance: backlog
