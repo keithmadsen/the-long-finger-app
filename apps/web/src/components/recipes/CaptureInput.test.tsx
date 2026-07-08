@@ -84,6 +84,21 @@ describe('CaptureInput', () => {
     expect(document.activeElement).toBe(input)
   })
 
+  it('Escape during IME composition preserves the draft and passes through', () => {
+    render(<CaptureInput onSubmit={vi.fn()} />)
+    const input = getInput()
+    fireEvent.change(input, { target: { value: 'composing draft' } })
+
+    const passedThrough = fireEvent.keyDown(input, {
+      key: 'Escape',
+      isComposing: true,
+    })
+
+    expect(passedThrough).toBe(true)
+    expect(input.value).toBe('composing draft')
+    expect(document.activeElement).toBe(input)
+  })
+
   it('exposes a focus() handle that focuses the input (Story 3.1, row-Escape return path)', () => {
     const ref = createRef<CaptureInputHandle>()
     render(<CaptureInput onSubmit={vi.fn()} ref={ref} />)

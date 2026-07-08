@@ -6,7 +6,7 @@ baseline_commit: f3bf0a4e7a0c78140b15cb308722c2eebff4a32c
 
 # Story 3.1: List-wide keyboard navigation
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -79,7 +79,7 @@ So that a long list is fast and predictable to use with the keyboard alone.
 
 ### Review Findings
 
-_(populated by code review)_
+- [x] [Review][Patch] Escape clears draft during IME composition [apps/web/src/components/recipes/CaptureInput.tsx:66]
 
 ## Dev Notes
 

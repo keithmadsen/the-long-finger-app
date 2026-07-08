@@ -63,8 +63,16 @@ export function CaptureInput({ onSubmit, ref }: CaptureInputProps) {
   // Escape with a non-empty draft clears it and keeps focus (Story 3.1 AC 5).
   // TextInput forwards the caller's onKeyDown BEFORE its Enter logic, so this
   // never interferes with submit. An empty field lets Escape pass untouched.
+  // IME composition also passes through: Escape can cancel/step composition and
+  // must not discard the surrounding draft text.
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key !== 'Escape' || value.length === 0) return
+    if (
+      event.key !== 'Escape' ||
+      event.nativeEvent.isComposing ||
+      value.length === 0
+    ) {
+      return
+    }
     event.preventDefault()
     setValue('')
   }
