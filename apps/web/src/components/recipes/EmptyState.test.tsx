@@ -23,6 +23,23 @@ describe('EmptyState', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
+  // Story 3.2 AC 3 lock: the non-list surfaces are PLAIN TEXT. Any live-region
+  // semantics here would self-announce on every load — the single polite
+  // LiveRegion in <App> is the app's only announcement channel.
+  it.each(['empty', 'loading', 'failed'] as const)(
+    '%s: carries no aria-live and no live role (Story 3.2 AC 3)',
+    (variant) => {
+      const { container } = render(
+        <EmptyState onRetry={() => {}} variant={variant} />,
+      )
+
+      expect(container.querySelector('[aria-live]')).toBeNull()
+      expect(
+        container.querySelector('[role="status"], [role="alert"], [role="log"]'),
+      ).toBeNull()
+    },
+  )
+
   it('failed: shows the error line and a working Retry that calls onRetry', async () => {
     const user = userEvent.setup()
     const onRetry = vi.fn()

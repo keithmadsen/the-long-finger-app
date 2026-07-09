@@ -99,7 +99,7 @@ export function useDeleteTodo({ announce }: UseDeleteTodoOptions = {}) {
     // failure announcement across toggle AND delete (curly apostrophe + quotes).
     onError: (_error, { description }) => {
       announce?.(
-        `Couldn’t update “${description}”. The list refreshed to current state.`,
+        `Couldn’t update ‘${description}’. The list refreshed to current state.`,
       )
     },
 
@@ -113,14 +113,20 @@ export function useDeleteTodo({ announce }: UseDeleteTodoOptions = {}) {
 
   // deleteTodo(id): per-row in-flight arbitration — if this row already has a
   // delete in flight, do NOT fire a conflicting second mutation. The description
-  // is read from the current cache row so the announcement has it (mirroring
-  // useToggleTodo.toggle); arbitration stays keyed on id alone.
+  // is snapshotted from the cache row into the mutation variables at call time
+  // (mirroring useToggleTodo.toggle) so the announcement carries it even if the
+  // row leaves the cache mid-flight; arbitration stays keyed on id alone. A
+  // cache MISS means the action is stale (the row already left backend truth
+  // and the reconcile is about to drop it from view) — bail rather than fire a
+  // DELETE whose 404-as-success announcement would render an empty
+  // disambiguator (Story 3.2 C2).
   function deleteTodo(id: string) {
     if (inFlightIdsRef.current.has(id)) return
-    inFlightIdsRef.current.add(id)
     const current = queryClient.getQueryData<Todo[]>(['todos'])
-    const description = current?.find((todo) => todo.id === id)?.description ?? ''
-    mutation.mutate({ id, description })
+    const row = current?.find((todo) => todo.id === id)
+    if (!row) return
+    inFlightIdsRef.current.add(id)
+    mutation.mutate({ id, description: row.description })
   }
 
   return { deleteTodo, deletingIds }

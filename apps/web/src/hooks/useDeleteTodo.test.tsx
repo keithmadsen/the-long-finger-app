@@ -162,6 +162,24 @@ describe('useDeleteTodo announcements (Story 2.3)', () => {
     expect(announce).toHaveBeenCalledWith('Buy milk deleted.')
   })
 
+  it('bails on a cache-evicted row: no DELETE, no empty-disambiguator announcement (Story 3.2 C2)', async () => {
+    const client = createTestQueryClient()
+    const announce = vi.fn()
+    // The acted-on row is NOT in the cache — a stale action (e.g. the row was
+    // removed in another tab and a refetch already reconciled it away).
+    client.setQueryData<Todo[]>(['todos'], [todo({ id: 'b', description: 'other' })])
+    const fetchMock = stubFetch({ getList: () => [] })
+
+    const { result } = setup(client, announce)
+    act(() => result.current.deleteTodo('a'))
+
+    // No mutation fires, so no 404-as-success path can announce " deleted."
+    // with an empty description.
+    await waitFor(() => expect(result.current.deletingIds.has('a')).toBe(false))
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(announce).not.toHaveBeenCalled()
+  })
+
   it('announces the shared mutation-failure copy once on error and does NOT write the cache in onError (AC 5)', async () => {
     const client = createTestQueryClient()
     const announce = vi.fn()
@@ -179,7 +197,7 @@ describe('useDeleteTodo announcements (Story 2.3)', () => {
     await waitFor(() => expect(announce).toHaveBeenCalledTimes(1))
     // The SAME string useToggleTodo.onError emits (curly apostrophe + curly quotes).
     expect(announce).toHaveBeenCalledWith(
-      'Couldn’t update “Buy milk”. The list refreshed to current state.',
+      'Couldn’t update ‘Buy milk’. The list refreshed to current state.',
     )
     // onError is announce-only: no cache rollback write (the row was never removed).
     expect(setSpy).not.toHaveBeenCalled()

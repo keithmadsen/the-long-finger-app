@@ -41,6 +41,13 @@ export class AppErrorBoundary extends Component<
     if (this.state.hasError) {
       return (
         <main>
+          {/*
+           * Deliberate exception to the single-live-region contract (Story 3.2
+           * AC 1, task B4): this role="alert" renders ONLY in the crashed-app
+           * fallback, where <App> — and with it the app's one polite
+           * <LiveRegion> — is unmounted. In any running state exactly one live
+           * region exists, so the contract holds.
+           */}
           <p role="alert">Something went wrong. Refresh to try again.</p>
         </main>
       )

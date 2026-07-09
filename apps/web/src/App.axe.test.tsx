@@ -97,6 +97,58 @@ describe('App accessibility (axe-core)', () => {
     expect(results).toHaveNoViolations()
   })
 
+  it('has no serious/critical violations with a FAILED create row present (Story 3.2)', async () => {
+    const user = userEvent.setup()
+    // POST 500s so the create lands in the Failed state (Retry/Dismiss +
+    // aria-describedby help text in the tree during the scan).
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (!init || init.method === undefined || init.method === 'GET') {
+        return new Response(JSON.stringify([]), { status: 200 })
+      }
+      return new Response('', { status: 500 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { container } = renderWithClient(<App />)
+    await screen.findByText('Your list will appear here.')
+
+    await user.type(
+      screen.getByPlaceholderText('What do you want to do?'),
+      'a failed task',
+    )
+    await user.keyboard('{Enter}')
+    await screen.findByRole('button', { name: 'Retry' })
+
+    const results = await axe(container, {
+      rules: { 'color-contrast': { enabled: false } },
+    })
+
+    expect(results).toHaveNoViolations()
+  })
+
+  it('has no serious/critical violations with an ARMED delete row (Story 3.2)', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify(TODOS), { status: 200 })),
+    )
+
+    const { container } = renderWithClient(<App />)
+    await screen.findByRole('list')
+
+    // Arm (but do not confirm) the first row's delete.
+    const [firstDelete] = screen.getAllByRole('button', { name: /^Delete '/ })
+    if (!firstDelete) throw new Error('no delete affordance found')
+    await user.click(firstDelete)
+    await screen.findByRole('button', { name: /^Confirm deletion of/ })
+
+    const results = await axe(container, {
+      rules: { 'color-contrast': { enabled: false } },
+    })
+
+    expect(results).toHaveNoViolations()
+  })
+
   it('has no serious/critical violations with a PENDING create row (aria-busy) (Story 1.7)', async () => {
     const user = userEvent.setup()
     // Never-resolving POST so the row stays pending (aria-busy) during the scan.

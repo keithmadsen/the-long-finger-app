@@ -50,6 +50,53 @@ describe('LiveRegion', () => {
     expect(region).not.toHaveTextContent('First message.')
   })
 
+  it('mutates the DOM text on an identical consecutive announce so AT re-announces', () => {
+    const ref = createRef<LiveRegionHandle>()
+    const { container } = render(<LiveRegion ref={ref} />)
+
+    const region = container.querySelector('[role="status"]') as HTMLElement
+
+    act(() => {
+      ref.current?.announce('Chores deleted.')
+    })
+    const firstRendered = region.textContent ?? ''
+
+    act(() => {
+      ref.current?.announce('Chores deleted.')
+    })
+    const secondRendered = region.textContent ?? ''
+
+    // AT only re-announces on a DOM mutation inside the region; jsdom cannot
+    // observe utterances, so the contract is: the rendered text node must
+    // differ between two identical announce() calls...
+    expect(secondRendered).not.toBe(firstRendered)
+
+    // ...while the spoken output (text minus the zero-width nonce) is the
+    // exact message both times.
+    expect(firstRendered.replace(/\u200B/g, '')).toBe('Chores deleted.')
+    expect(secondRendered.replace(/\u200B/g, '')).toBe('Chores deleted.')
+  })
+
+  it('mutates the DOM text on every announce in an identical-message run', () => {
+    const ref = createRef<LiveRegionHandle>()
+    const { container } = render(<LiveRegion ref={ref} />)
+
+    const region = container.querySelector('[role="status"]') as HTMLElement
+    const rendered: string[] = []
+
+    for (let i = 0; i < 4; i += 1) {
+      act(() => {
+        ref.current?.announce('Retry failed.')
+      })
+      rendered.push(region.textContent ?? '')
+    }
+
+    for (let i = 1; i < rendered.length; i += 1) {
+      expect(rendered[i]).not.toBe(rendered[i - 1])
+      expect((rendered[i] ?? '').replace(/\u200B/g, '')).toBe('Retry failed.')
+    }
+  })
+
   it('does not steal focus when announcing', () => {
     const ref = createRef<LiveRegionHandle>()
 
