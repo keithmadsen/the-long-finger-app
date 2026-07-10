@@ -162,22 +162,20 @@ describe('useDeleteTodo announcements (Story 2.3)', () => {
     expect(announce).toHaveBeenCalledWith('Buy milk deleted.')
   })
 
-  it('bails on a cache-evicted row: no DELETE, no empty-disambiguator announcement (Story 3.2 C2)', async () => {
+  it('uses the rendered description when the query cache misses, avoiding a silent visible-row no-op (Story 3.2 review)', async () => {
     const client = createTestQueryClient()
     const announce = vi.fn()
-    // The acted-on row is NOT in the cache — a stale action (e.g. the row was
-    // removed in another tab and a refetch already reconciled it away).
+    // The acted-on row is NOT in the cache, but the UI still has the rendered
+    // row description from the delete affordance that was just confirmed.
     client.setQueryData<Todo[]>(['todos'], [todo({ id: 'b', description: 'other' })])
     const fetchMock = stubFetch({ getList: () => [] })
 
     const { result } = setup(client, announce)
-    act(() => result.current.deleteTodo('a'))
+    act(() => result.current.deleteTodo('a', 'Rendered row'))
 
-    // No mutation fires, so no 404-as-success path can announce " deleted."
-    // with an empty description.
-    await waitFor(() => expect(result.current.deletingIds.has('a')).toBe(false))
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(announce).not.toHaveBeenCalled()
+    await waitFor(() => expect(announce).toHaveBeenCalledTimes(1))
+    expect(fetchMock).toHaveBeenCalled()
+    expect(announce).toHaveBeenCalledWith('Rendered row deleted.')
   })
 
   it('announces the shared mutation-failure copy once on error and does NOT write the cache in onError (AC 5)', async () => {

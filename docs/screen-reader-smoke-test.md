@@ -106,7 +106,7 @@ Stop the API (`Ctrl+C` the `dev:api` process, or kill port 3001) to force failur
 
 | Date | Environment | Result | Notes |
 |---|---|---|---|
-| — | — | **pending** | Per decision 2026-07-09: recorded against the release candidate alongside the NVDA leg (Story 3.2 closed on the scripted artifact + automated evidence — jsdom DOM mechanics + browser-level e2e spec). |
+| — | — | **pending first run** | Per review decision 2026-07-10: recorded against the release candidate alongside the NVDA leg (Story 3.2 closed on the scripted artifact + automated evidence — jsdom DOM mechanics + browser-level e2e spec). |
 
 ### NVDA leg
 

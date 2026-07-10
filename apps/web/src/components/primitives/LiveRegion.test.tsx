@@ -97,6 +97,26 @@ describe('LiveRegion', () => {
     }
   })
 
+  it('keeps a distinct final text node when identical announces are batched', () => {
+    const ref = createRef<LiveRegionHandle>()
+    const { container } = render(<LiveRegion ref={ref} />)
+
+    const region = container.querySelector('[role="status"]') as HTMLElement
+    act(() => {
+      ref.current?.announce('Retry failed.')
+    })
+    const firstRendered = region.textContent ?? ''
+
+    act(() => {
+      ref.current?.announce('Retry failed.')
+      ref.current?.announce('Retry failed.')
+    })
+    const batchedRendered = region.textContent ?? ''
+
+    expect(batchedRendered).not.toBe(firstRendered)
+    expect(batchedRendered.replace(/\u200B/g, '')).toBe('Retry failed.')
+  })
+
   it('does not steal focus when announcing', () => {
     const ref = createRef<LiveRegionHandle>()
 

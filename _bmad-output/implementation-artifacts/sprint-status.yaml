@@ -1,5 +1,5 @@
 # generated: 2026-06-16
-# last_updated: 2026-07-01
+# last_updated: 2026-07-10
 # project: the long finger
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-16
-last_updated: 2026-07-09  # 3-2 → review (dev-story complete)
+last_updated: 2026-07-10  # 3-2 → done (code-review patches applied)
 # 2026-07-01: 2-2 dev-story complete
 # 2026-07-01: 2-1 → in-progress (dev-story)
 # 2026-07-01: 2-1 → review (dev-story complete)
@@ -139,7 +139,7 @@ development_status:
   # Epic 3: Production Readiness & Delivery
   epic-3: in-progress
   3-1-list-wide-keyboard-navigation: done
-  3-2-consolidated-screen-reader-contract: review
+  3-2-consolidated-screen-reader-contract: done
   3-3-responsive-forced-colors-reduced-motion-verification: backlog
   3-4-expanded-ci-quality-gates-wcag-conformance: backlog
   3-5-hardened-production-deploy: backlog

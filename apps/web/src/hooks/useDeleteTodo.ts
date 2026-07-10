@@ -113,20 +113,22 @@ export function useDeleteTodo({ announce }: UseDeleteTodoOptions = {}) {
 
   // deleteTodo(id): per-row in-flight arbitration — if this row already has a
   // delete in flight, do NOT fire a conflicting second mutation. The description
-  // is snapshotted from the cache row into the mutation variables at call time
-  // (mirroring useToggleTodo.toggle) so the announcement carries it even if the
-  // row leaves the cache mid-flight; arbitration stays keyed on id alone. A
-  // cache MISS means the action is stale (the row already left backend truth
-  // and the reconcile is about to drop it from view) — bail rather than fire a
-  // DELETE whose 404-as-success announcement would render an empty
-  // disambiguator (Story 3.2 C2).
-  function deleteTodo(id: string) {
+  // is snapshotted at call time (mirroring useToggleTodo.toggle) so the
+  // announcement carries it even if the row leaves the cache mid-flight;
+  // arbitration stays keyed on id alone. App/TodoList passes the rendered row
+  // description; the cache lookup remains as a hook-level fallback for direct
+  // callers in tests or future integrations.
+  function deleteTodo(id: string, renderedDescription?: string) {
     if (inFlightIdsRef.current.has(id)) return
     const current = queryClient.getQueryData<Todo[]>(['todos'])
     const row = current?.find((todo) => todo.id === id)
-    if (!row) return
+    const description = renderedDescription ?? row?.description
+    if (!description) {
+      void queryClient.invalidateQueries({ queryKey: ['todos'] })
+      return
+    }
     inFlightIdsRef.current.add(id)
-    mutation.mutate({ id, description: row.description })
+    mutation.mutate({ id, description })
   }
 
   return { deleteTodo, deletingIds }

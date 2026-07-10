@@ -134,24 +134,22 @@ describe('useToggleTodo', () => {
     expect(announce).toHaveBeenCalledWith('Done thing marked active.')
   })
 
-  it('bails on a cache-evicted row: no PATCH, no empty-disambiguator announcement (Story 3.2 C2)', async () => {
+  it('uses the rendered description when the query cache misses, avoiding a silent visible-row no-op (Story 3.2 review)', async () => {
     const client = createTestQueryClient()
     const announce = vi.fn()
     // The acted-on row is NOT in the cache — a stale action on a row a refetch
-    // already reconciled away.
+    // has not represented, while the UI still has the rendered row description.
     client.setQueryData<Todo[]>(['todos'], [
       todo({ id: 'b', description: 'other', completed: false }),
     ])
     const fetchMock = stubFetch({ getList: () => [] })
 
     const { result } = setup(client, announce)
-    act(() => result.current.toggle('a', true))
+    act(() => result.current.toggle('a', true, 'Rendered row'))
 
-    await waitFor(() =>
-      expect(Object.keys(result.current.togglingCompletedById)).toHaveLength(0),
-    )
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(announce).not.toHaveBeenCalled()
+    await waitFor(() => expect(announce).toHaveBeenCalledTimes(1))
+    expect(fetchMock).toHaveBeenCalled()
+    expect(announce).toHaveBeenCalledWith('Rendered row marked complete.')
   })
 
   it('on error reverts THIS row in place and invalidates to reconcile, announcing the failure once (AC 5)', async () => {

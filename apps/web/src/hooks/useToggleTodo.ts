@@ -109,19 +109,21 @@ export function useToggleTodo({ announce }: UseToggleTodoOptions = {}) {
 
   // toggle(id, completed): per-row in-flight arbitration (AC 8) — if this row
   // already has a toggle in flight, do NOT fire a conflicting second mutation.
-  // The description is snapshotted from the cache row into the mutation
-  // variables at call time so the announcement carries it even if the row
-  // leaves the cache mid-flight. A cache MISS means the action is stale (the
-  // row is already gone from backend truth and the reconcile is about to drop
-  // it from view) — bail rather than fire a mutation whose announcement would
-  // render an empty disambiguator (Story 3.2 C2).
-  function toggle(id: string, completed: boolean) {
+  // The description is snapshotted at call time so the announcement carries it
+  // even if the row leaves the cache mid-flight. App/TodoList passes the
+  // rendered row description; the cache lookup remains as a hook-level fallback
+  // for direct callers in tests or future integrations.
+  function toggle(id: string, completed: boolean, renderedDescription?: string) {
     if (inFlightIdsRef.current.has(id)) return
     const current = queryClient.getQueryData<Todo[]>(['todos'])
     const row = current?.find((todo) => todo.id === id)
-    if (!row) return
+    const description = renderedDescription ?? row?.description
+    if (!description) {
+      void queryClient.invalidateQueries({ queryKey: ['todos'] })
+      return
+    }
     inFlightIdsRef.current.add(id)
-    mutation.mutate({ id, completed, description: row.description })
+    mutation.mutate({ id, completed, description })
   }
 
   return { toggle, togglingCompletedById }

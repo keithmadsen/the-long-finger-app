@@ -13,7 +13,7 @@ export interface TodoListProps {
   /** Pending toggle destination by id, used for checkbox-only optimistic feedback. */
   togglingCompletedById?: Readonly<Record<string, boolean>>
   /** Toggle a row's completion (1.8). Wired by App to useToggleTodo. */
-  onToggle?: (id: string, completed: boolean) => void
+  onToggle?: (id: string, completed: boolean, description: string) => void
   /** Ids in the Failed-create state — each maps to a Failed <TodoItem> (1.9). */
   failedIds?: ReadonlySet<string>
   /** Re-attempt a failed create by id (1.9). */
@@ -23,7 +23,7 @@ export interface TodoListProps {
   /** Id of the shared hidden help text every failed row references (AC 5). */
   describedById?: string
   /** Commit a confirmed delete by id (2.2). Wired by App to useDeleteTodo. */
-  onDelete?: (id: string) => void
+  onDelete?: (id: string, description: string) => void
   /** Ids whose DELETE is in flight — each maps to a Committing <TodoItem> (2.1). */
   deletingIds?: ReadonlySet<string>
   /**
@@ -68,8 +68,16 @@ export function TodoList({
   // The single-armed arm-then-confirm state machine (AC 5). A confirmed press
   // calls back into App's delete mutation. The 300 ms / 5 s timers run on the
   // default realClock in production; Story 2.3 injects a fake clock for races.
+  const todoById = useMemo(
+    () => new Map(todos.map((todo) => [todo.id, todo])),
+    [todos],
+  )
+
   const { armedId, press, cancel } = useArmedDelete({
-    onCommit: (id) => onDelete?.(id),
+    onCommit: (id) => {
+      const todo = todoById.get(id)
+      if (todo) onDelete?.(id, todo.description)
+    },
   })
 
   // The navigable ids, in render order (derivative of query order — never
@@ -112,7 +120,9 @@ export function TodoList({
             onDeletePress={canDelete ? () => press(todo.id) : undefined}
             onDismiss={() => onDismiss?.(todo.id)}
             onRetry={() => onRetry?.(todo.id)}
-            onToggle={(completed) => onToggle?.(todo.id, completed)}
+            onToggle={(completed) =>
+              onToggle?.(todo.id, completed, todo.description)
+            }
             pendingCompleted={isFailed ? undefined : togglingCompletedById?.[todo.id]}
             pending={
               !isFailed &&
