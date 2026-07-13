@@ -145,6 +145,16 @@
 .delete {
   margin-inline-start: auto;
   flex: none;
+  /*
+   * The Button primitive is inline-flex; in the default row direction the
+   * hidden ::after reservation below would sit BESIDE the label as a flex item
+   * (adding its width instead of reserving it — Story 3.3's reflow gate caught
+   * exactly that: idle→armed grew by Confirm−Delete). Column direction stacks
+   * the zero-height ::after under the label so the button width is
+   * max(label, "Confirm") in both states; the primitive's justify/align pair
+   * keeps the label centred in either axis.
+   */
+  flex-direction: column;
   color: var(--color-on-surface-muted);
   font-size: var(--font-size-secondary);
   font-weight: var(--font-weight-medium);

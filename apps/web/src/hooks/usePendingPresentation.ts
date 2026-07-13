@@ -1,6 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 
 /*
+ * Reduced-motion read for the min-hold collapse (Story 3.3, AC 5). jsdom has no
+ * matchMedia, so the default guards; tests inject through the hook param instead
+ * of polyfilling the global. Read once per mount (a mid-session OS toggle applies
+ * from the next mutation) — a live `change` listener would be extra machinery for
+ * a vanishingly rare event.
+ */
+export function prefersReducedMotion(): boolean {
+  return typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    : false
+}
+
+/*
  * The shared honest-pending PRESENTATION seam (Story 1.7, AC 4–8). Given a single
  * mutation's `pending` boolean it derives two INDEPENDENT signals:
  *
@@ -54,8 +67,17 @@ export interface PendingPresentation {
 export function usePendingPresentation(
   pending: boolean,
   clock: PendingClock = realClock,
+  reducedMotionRead: () => boolean = prefersReducedMotion,
 ): PendingPresentation {
   const [showPending, setShowPending] = useState(false)
+
+  // Under reduced motion the min-hold collapses to zero — the settled state
+  // appears immediately on confirm (AC 5). The flicker threshold is NOT motion
+  // (it's the anti-flicker promise: a <150ms confirm never paints pending) and
+  // stays unchanged. useState's initializer = the read-once-per-mount seam.
+  const [minHoldMs] = useState(() =>
+    reducedMotionRead() ? 0 : PENDING_MIN_HOLD_MS,
+  )
 
   // Timer handles + visual-state mirror live in refs so the effect can read/write
   // them synchronously without re-subscribing on every render. The `clock` is a
@@ -96,7 +118,7 @@ export function usePendingPresentation(
     // If the visual is already up, honour the minimum-hold floor before settling.
     if (shownRef.current && hideHandle.current === null) {
       const elapsed = clk.now() - visibleSinceRef.current
-      if (elapsed >= PENDING_MIN_HOLD_MS) {
+      if (elapsed >= minHoldMs) {
         shownRef.current = false
         setShowPending(false)
       } else {
@@ -104,10 +126,10 @@ export function usePendingPresentation(
           hideHandle.current = null
           shownRef.current = false
           setShowPending(false)
-        }, PENDING_MIN_HOLD_MS - elapsed)
+        }, minHoldMs - elapsed)
       }
     }
-  }, [pending, clock])
+  }, [pending, clock, minHoldMs])
 
   // Clear any outstanding timers on unmount.
   useEffect(() => {
