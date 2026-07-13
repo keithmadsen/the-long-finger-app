@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-16
-last_updated: 2026-07-10  # 3-2 → done (code-review patches applied)
+last_updated: 2026-07-13  # 3-3 → ready-for-dev (create-story)
 # 2026-07-01: 2-2 dev-story complete
 # 2026-07-01: 2-1 → in-progress (dev-story)
 # 2026-07-01: 2-1 → review (dev-story complete)
@@ -109,6 +109,7 @@ project: the long finger
 # 2026-07-08: 3-2 → ready-for-dev (create-story); LiveRegion re-announce fix (nonce) + SR audit-lock tests + scripted NVDA/VoiceOver smoke artifact folded in; NVDA leg default = first recorded run at release candidate
 # 2026-07-08: 3-2 → in-progress (dev-story)
 # 2026-07-09: 3-2 → review (dev-story complete); VoiceOver+NVDA smoke legs recorded as pending → release candidate (Keith's call); LiveRegion re-announce deferred item resolved (nonce)
+# 2026-07-13: 3-3 → ready-for-dev (create-story); verification story — Playwright emulation gates (forced-colors/reduced-motion/200%-zoom/responsive/reflow) + reduced-motion pending-min-hold collapse (only runtime change); gate specs green via test:e2e in-story, CI e2e job stays 3.4
 project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"
@@ -140,7 +141,7 @@ development_status:
   epic-3: in-progress
   3-1-list-wide-keyboard-navigation: done
   3-2-consolidated-screen-reader-contract: done
-  3-3-responsive-forced-colors-reduced-motion-verification: backlog
+  3-3-responsive-forced-colors-reduced-motion-verification: ready-for-dev
   3-4-expanded-ci-quality-gates-wcag-conformance: backlog
   3-5-hardened-production-deploy: backlog
   epic-3-retrospective: optional
