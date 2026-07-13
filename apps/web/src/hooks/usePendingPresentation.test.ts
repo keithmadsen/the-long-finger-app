@@ -43,10 +43,11 @@ function makeFakeClock() {
   return { clock, advance }
 }
 
-function setup(initialPending: boolean) {
+function setup(initialPending: boolean, prefersReducedMotion?: () => boolean) {
   const fake = makeFakeClock()
   const view = renderHook(
-    ({ pending }) => usePendingPresentation(pending, fake.clock),
+    ({ pending }) =>
+      usePendingPresentation(pending, fake.clock, prefersReducedMotion),
     { initialProps: { pending: initialPending } },
   )
   return { ...view, advance: (ms: number) => act(() => fake.advance(ms)) }
@@ -113,6 +114,46 @@ describe('usePendingPresentation', () => {
 
     act(() => rerender({ pending: false }))
     expect(result.current.showPending).toBe(false) // no extra hold needed
+  })
+
+  describe('under prefers-reduced-motion: reduce (Story 3.3, AC 5)', () => {
+    const reduced = () => true
+
+    it('collapses the minimum-hold: a confirm after the threshold settles immediately', () => {
+      const { result, rerender, advance } = setup(true, reduced)
+
+      advance(FLICKER_THRESHOLD_MS) // visible at t=150
+      expect(result.current.showPending).toBe(true)
+
+      // Confirm right after becoming visible — no 500ms hold under reduced motion.
+      act(() => rerender({ pending: false }))
+      expect(result.current.showPending).toBe(false)
+      expect(result.current.ariaBusy).toBe(false)
+    })
+
+    it('keeps the flicker threshold: a confirm under 150ms still never paints pending', () => {
+      const { result, rerender, advance } = setup(true, reduced)
+
+      advance(FLICKER_THRESHOLD_MS - 1)
+      expect(result.current.showPending).toBe(false)
+
+      act(() => rerender({ pending: false }))
+      advance(FLICKER_THRESHOLD_MS) // let any stray timer fire
+      expect(result.current.showPending).toBe(false)
+    })
+
+    it('with reduced motion NOT preferred the min-hold floor applies unchanged', () => {
+      const { result, rerender, advance } = setup(true, () => false)
+
+      advance(FLICKER_THRESHOLD_MS)
+      act(() => rerender({ pending: false }))
+      expect(result.current.showPending).toBe(true) // held
+
+      advance(PENDING_MIN_HOLD_MS - 1)
+      expect(result.current.showPending).toBe(true)
+      advance(1)
+      expect(result.current.showPending).toBe(false)
+    })
   })
 
   it('is per-instance: two hooks do not share threshold/hold state (AC 7)', () => {

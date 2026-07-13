@@ -10,8 +10,6 @@ import { defineConfig, devices } from '@playwright/test'
 // tests browserless (fast) while UI tests run in Chromium:
 //   - `api`     → **/*.api.spec.ts, no browser
 //   - `chromium`→ everything else, Desktop Chrome
-// Story 3.3 will add forced-colors / reduced-motion / 200%-zoom projects on top
-// (see the extension point below).
 
 // The web (Vite) dev origin. It proxies /todos and /health to the Fastify API,
 // so a single baseURL serves both UI navigation and apiRequest path resolution.
@@ -51,12 +49,10 @@ export default defineConfig({
       testIgnore: /.*\.api\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
-    // Story 3.3 extension point — add emulation projects that reuse the specs
-    // above, e.g.:
-    //   { name: 'reduced-motion', testIgnore: /.*\.api\.spec\.ts/,
-    //     use: { ...devices['Desktop Chrome'], reducedMotion: 'reduce' } },
-    //   { name: 'forced-colors', testIgnore: /.*\.api\.spec\.ts/,
-    //     use: { ...devices['Desktop Chrome'], forcedColors: 'active' } },
+    // Emulation gates (Story 3.3) are per-test `page.emulateMedia()` /
+    // `setViewportSize()` calls in e2e/tests/ui/a11y-modes.spec.ts — dedicated
+    // projects would only re-run whole suites under emulation (a Story 3.4
+    // scale decision if ever wanted).
   ],
   // Boot the full app (Fastify API + Vite web) against an isolated SQLite file
   // so E2E runs never touch dev data. DATABASE_PATH is resolved relative to
