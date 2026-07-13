@@ -6,7 +6,7 @@ baseline_commit: 215aef2e4424167bcc0cd99a3e99c0f784f0d783
 
 # Story 3.3: Responsive, forced-colors & reduced-motion verification
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -84,6 +84,16 @@ So that the experience holds up regardless of how or where I use it.
   - [x] G1. `npm run test --workspace apps/web` (web baseline 239 tests / 20 files — all green + new A4 tests), `npm test` for apps/api under **Node 24** (`nvm use 24`; 49 tests), `npm run typecheck`, eslint, `lint:css` + `lint:css:selftest`, `contrast:check` (7/7 pairs), `build`, `size:check` (baseline 92,295 B gz + 512 B tolerance; 3.2 landed at 92,358 B so ~449 B headroom remains — the A-task matchMedia read is tens of bytes; if legitimately over, rebaseline per convention and say so).
   - [x] G2. `npm run test:e2e` — existing 6 tests + all new emulation specs, green **twice consecutively** (the 3.1/3.2 flake-hunting convention; parallel workers + shared DB). Locally the harness attaches to a running `npm run dev` (`reuseExistingServer`), `DATABASE_PATH=./data/e2e.db`.
   - [x] G3. Live-browser sanity pass (the 3.1 lesson — do this BEFORE marking review): macOS actually supports checking two of the three modes interactively — System Settings → Accessibility → Display → "Reduce motion" and "Increase contrast" — plus real browser zoom at 200%. Chrome DevTools Rendering tab can force `forced-colors: active` + `prefers-reduced-motion` + `prefers-contrast`. Spot-check each gate's subject matter by eye once; the specs are the repeatable gate, the eyeball run catches what the assertions didn't think to ask.
+
+### Review Findings
+
+- [x] [Review][Patch] Add a pointer-hover browser gate for the row hover treatment and delete reveal required by AC 1 [e2e/tests/ui/a11y-modes.spec.ts:266]
+- [x] [Review][Patch] Assert visible forced-colors borders for the capture input, checkbox indicator, and delete affordance as required by the committed gate [e2e/tests/ui/a11y-modes.spec.ts:72]
+- [x] [Review][Patch] Cover both timed motion tokens and confirm `--motion-none` remains zero; the current reduced-motion assertions sample only `--motion-settle` consumers [e2e/tests/ui/a11y-modes.spec.ts:148]
+- [x] [Review][Patch] Measure the always-visible mobile delete affordance so the 48px gate covers all touch targets [e2e/tests/ui/a11y-modes.spec.ts:255]
+- [x] [Review][Patch] Exercise the capture input at the 200%-zoom equivalent viewport instead of checking visibility alone [e2e/tests/ui/a11y-modes.spec.ts:220]
+- [x] [Review][Patch] Remove the wall-clock delay from the inside-300ms delete assertion so event-loop stalls cannot turn the safety-window gate into a commit [e2e/tests/ui/a11y-modes.spec.ts:179]
+- [x] [Review][Patch] Compare the edge background with the live surface token; non-transparency alone does not lock paper-to-the-edges continuity [e2e/tests/ui/a11y-modes.spec.ts:287]
 
 ## Dev Notes
 

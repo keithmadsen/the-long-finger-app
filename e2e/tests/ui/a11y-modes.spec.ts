@@ -93,6 +93,23 @@ test.describe('forced-colors gate (Story 3.3, AC 3)', () => {
     expect(inputOutline.style).not.toBe('none')
     expect(inputOutline.width).not.toBe('0px')
 
+    // The committed forced-colors gate also requires every interactive control
+    // to retain a visible boundary. Compare each border with its flattened
+    // background instead of assuming a particular OS high-contrast palette.
+    const borderMetrics = (el: Element) => {
+      const s = getComputedStyle(el)
+      return {
+        style: s.borderStyle,
+        width: s.borderWidth,
+        color: s.borderColor,
+        background: s.backgroundColor,
+      }
+    }
+    const inputBorder = await input.evaluate(borderMetrics)
+    expect(inputBorder.style).not.toBe('none')
+    expect(inputBorder.width).not.toBe('0px')
+    expect(inputBorder.color).not.toBe(inputBorder.background)
+
     // (b) Completion cues are structural, not color-only: strikethrough on the
     // text plus the checkbox's foreground ✓ glyph (a ::before with content,
     // never background-only — backgrounds flatten under forced colors).
@@ -118,6 +135,20 @@ test.describe('forced-colors gate (Story 3.3, AC 3)', () => {
         return getComputedStyle(indicator, '::before').opacity
       })
     expect(activeGlyph).toBe('0')
+    const checkboxBorder = await row(page, doneName)
+      .getByRole('checkbox')
+      .evaluate((el) => {
+        const s = getComputedStyle(el.nextElementSibling as Element)
+        return {
+          style: s.borderStyle,
+          width: s.borderWidth,
+          color: s.borderColor,
+          background: s.backgroundColor,
+        }
+      })
+    expect(checkboxBorder.style).not.toBe('none')
+    expect(checkboxBorder.width).not.toBe('0px')
+    expect(checkboxBorder.color).not.toBe(checkboxBorder.background)
 
     // (c) The armed-delete signal is the visible LABEL flip (Delete→Confirm)
     // plus aria-pressed — asserting the --color-error swap here would be wrong
@@ -129,6 +160,10 @@ test.describe('forced-colors gate (Story 3.3, AC 3)', () => {
     const armedButton = row(page, activeName).getByRole('button')
     await expect(armedButton).toHaveText('Confirm')
     await expect(armedButton).toHaveAttribute('aria-pressed', 'true')
+    const buttonBorder = await armedButton.evaluate(borderMetrics)
+    expect(buttonBorder.style).not.toBe('none')
+    expect(buttonBorder.width).not.toBe('0px')
+    expect(buttonBorder.color).not.toBe(buttonBorder.background)
   })
 })
 
@@ -144,6 +179,16 @@ test.describe('reduced-motion gate (Story 3.3, AC 5)', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/')
     await expect(row(page, name)).toHaveCount(1)
+
+    const motionTokens = await page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement)
+      return {
+        instant: root.getPropertyValue('--motion-instant').trim(),
+        settle: root.getPropertyValue('--motion-settle').trim(),
+        none: root.getPropertyValue('--motion-none').trim(),
+      }
+    })
+    expect(motionTokens).toEqual({ instant: '0ms', settle: '0ms', none: '0ms' })
 
     // Every transition rides --motion-instant/--motion-settle, which tokens.css
     // collapses to 0ms under reduced motion (single global collapse — no
@@ -167,18 +212,24 @@ test.describe('reduced-motion gate (Story 3.3, AC 5)', () => {
         ),
       ),
     ).toBe(true)
+    expect(
+      allZero(
+        await page
+          .getByPlaceholder(CAPTURE_PLACEHOLDER)
+          .evaluate((el) => getComputedStyle(el).transitionDuration),
+      ),
+    ).toBe(true)
 
     // The delete SAFETY windows are deliberately not motion (useArmedDelete
     // design comment): under reduced motion a second press inside the 300ms
     // muscle-memory window is still ABSORBED, and the armed state still holds
     // well before the 5s auto-revert. Both presses run in-browser with a fixed
-    // ~100ms gap so the within-window timing is deterministic (Playwright
-    // action overhead could accidentally cross 300ms). The 5s auto-revert race
+    // same-task gap so event-loop stalls cannot accidentally cross 300ms. The
+    // 5s auto-revert race
     // itself is unit-tested against the injectable clock (2.3) — asserting a
     // wall-clock 5s wait here would only buy flake.
-    await deleteButton.evaluate(async (el) => {
+    await deleteButton.evaluate((el) => {
       ;(el as HTMLElement).click() // arm
-      await new Promise((resolve) => setTimeout(resolve, 100))
       ;(el as HTMLElement).click() // inside the no-commit window → absorbed
     })
     const armedButton = row(page, name).getByRole('button')
@@ -221,6 +272,8 @@ test.describe('responsive + 200%-zoom + reflow gates (Story 3.3, AC 1, 2, 6)', (
     // clickable at this size.
     const input = page.getByPlaceholder(CAPTURE_PLACEHOLDER)
     await expect(input).toBeVisible()
+    await input.fill(`zoom capture ${stamp}`)
+    await expect(input).toHaveValue(`zoom capture ${stamp}`)
     await row(page, shortName).locator('label').click()
     await expect(
       page.getByRole('checkbox', { name: shortName }),
@@ -261,6 +314,11 @@ test.describe('responsive + 200%-zoom + reflow gates (Story 3.3, AC 1, 2, 6)', (
       .boundingBox()
     expect(inputBox).not.toBeNull()
     expect(inputBox!.height).toBeGreaterThanOrEqual(48)
+    const deleteBox = await page
+      .getByRole('button', { name: `Delete '${name}'` })
+      .boundingBox()
+    expect(deleteBox).not.toBeNull()
+    expect(deleteBox!.height).toBeGreaterThanOrEqual(48)
   })
 
   test('@p1 desktop 1280×800: column caps at 640px with 32px padding, paper to the edges', async ({
@@ -268,11 +326,13 @@ test.describe('responsive + 200%-zoom + reflow gates (Story 3.3, AC 1, 2, 6)', (
     seedTodos,
   }) => {
     const stamp = randomToken()
-    await seedTodos([{ description: `desktop row ${stamp}` }])
+    const name = `desktop row ${stamp}`
+    await seedTodos([{ description: name }])
 
     await page.setViewportSize({ width: 1280, height: 800 })
     await page.goto('/')
-    await expect(row(page, `desktop row ${stamp}`)).toHaveCount(1)
+    const desktopRow = row(page, name)
+    await expect(desktopRow).toHaveCount(1)
 
     // ≥640px: content centred in a 640px column (border-box: max-width 40rem
     // caps the whole border box) with 32px padding.
@@ -290,10 +350,33 @@ test.describe('responsive + 200%-zoom + reflow gates (Story 3.3, AC 1, 2, 6)', (
     const mainBox = await page.locator('main').boundingBox()
     expect(mainBox).not.toBeNull()
     expect(mainBox!.width).toBe(1280)
-    const bodyBg = await page.evaluate(
-      () => getComputedStyle(document.body).backgroundColor,
+    const edgeColors = await page.evaluate(() => {
+      const probe = document.createElement('span')
+      probe.style.background = 'var(--color-surface)'
+      document.body.append(probe)
+      const colors = {
+        body: getComputedStyle(document.body).backgroundColor,
+        surface: getComputedStyle(probe).backgroundColor,
+      }
+      probe.remove()
+      return colors
+    })
+    expect(edgeColors.body).toBe(edgeColors.surface)
+
+    // Desktop Chrome is hover-capable: the pointer-only media rule reveals the
+    // delete affordance and applies the row hover treatment.
+    expect(await page.evaluate(() => matchMedia('(hover: hover)').matches)).toBe(
+      true,
     )
-    expect(bodyBg).not.toBe('rgba(0, 0, 0, 0)') // not transparent
+    const deleteButton = page.getByRole('button', { name: `Delete '${name}'` })
+    await expect(deleteButton).toHaveCSS('opacity', '0')
+    const rowAnchor = desktopRow.locator('label')
+    const idleBackground = await rowAnchor.evaluate(
+      (el) => getComputedStyle(el).backgroundColor,
+    )
+    await rowAnchor.hover()
+    await expect(deleteButton).toHaveCSS('opacity', '1')
+    await expect(rowAnchor).not.toHaveCSS('background-color', idleBackground)
   })
 
   test('@p1 reflow lock: toggle and arm-delete change zero geometry', async ({
