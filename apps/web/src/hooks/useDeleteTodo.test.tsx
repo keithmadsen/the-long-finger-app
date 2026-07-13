@@ -162,6 +162,22 @@ describe('useDeleteTodo announcements (Story 2.3)', () => {
     expect(announce).toHaveBeenCalledWith('Buy milk deleted.')
   })
 
+  it('uses the rendered description when the query cache misses, avoiding a silent visible-row no-op (Story 3.2 review)', async () => {
+    const client = createTestQueryClient()
+    const announce = vi.fn()
+    // The acted-on row is NOT in the cache, but the UI still has the rendered
+    // row description from the delete affordance that was just confirmed.
+    client.setQueryData<Todo[]>(['todos'], [todo({ id: 'b', description: 'other' })])
+    const fetchMock = stubFetch({ getList: () => [] })
+
+    const { result } = setup(client, announce)
+    act(() => result.current.deleteTodo('a', 'Rendered row'))
+
+    await waitFor(() => expect(announce).toHaveBeenCalledTimes(1))
+    expect(fetchMock).toHaveBeenCalled()
+    expect(announce).toHaveBeenCalledWith('Rendered row deleted.')
+  })
+
   it('announces the shared mutation-failure copy once on error and does NOT write the cache in onError (AC 5)', async () => {
     const client = createTestQueryClient()
     const announce = vi.fn()
@@ -179,7 +195,7 @@ describe('useDeleteTodo announcements (Story 2.3)', () => {
     await waitFor(() => expect(announce).toHaveBeenCalledTimes(1))
     // The SAME string useToggleTodo.onError emits (curly apostrophe + curly quotes).
     expect(announce).toHaveBeenCalledWith(
-      'Couldn’t update “Buy milk”. The list refreshed to current state.',
+      'Couldn’t update ‘Buy milk’. The list refreshed to current state.',
     )
     // onError is announce-only: no cache rollback write (the row was never removed).
     expect(setSpy).not.toHaveBeenCalled()

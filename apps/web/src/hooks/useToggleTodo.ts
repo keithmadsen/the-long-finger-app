@@ -94,10 +94,11 @@ export function useToggleTodo({ announce }: UseToggleTodoOptions = {}) {
     onError: async (_error, { description }) => {
       // Reconcile to backend truth (AC 5): the change must not silently persist.
       await queryClient.invalidateQueries({ queryKey: ['todos'] })
-      // Curly apostrophe + curly quotes to match the existing failure copy. Announce
-      // only after the reconciliation request has completed.
+      // Curly apostrophe + curly SINGLE quotes around the description — the
+      // committed §2.6 copy style, shared with create failure (Story 3.2 C1).
+      // Announce only after the reconciliation request has completed.
       announce?.(
-        `Couldn’t update “${description}”. The list refreshed to current state.`,
+        `Couldn’t update ‘${description}’. The list refreshed to current state.`,
       )
     },
 
@@ -108,12 +109,20 @@ export function useToggleTodo({ announce }: UseToggleTodoOptions = {}) {
 
   // toggle(id, completed): per-row in-flight arbitration (AC 8) — if this row
   // already has a toggle in flight, do NOT fire a conflicting second mutation.
-  // The description is read from the current cache row so the announcement has it.
-  function toggle(id: string, completed: boolean) {
+  // The description is snapshotted at call time so the announcement carries it
+  // even if the row leaves the cache mid-flight. App/TodoList passes the
+  // rendered row description; the cache lookup remains as a hook-level fallback
+  // for direct callers in tests or future integrations.
+  function toggle(id: string, completed: boolean, renderedDescription?: string) {
     if (inFlightIdsRef.current.has(id)) return
-    inFlightIdsRef.current.add(id)
     const current = queryClient.getQueryData<Todo[]>(['todos'])
-    const description = current?.find((todo) => todo.id === id)?.description ?? ''
+    const row = current?.find((todo) => todo.id === id)
+    const description = renderedDescription ?? row?.description
+    if (!description) {
+      void queryClient.invalidateQueries({ queryKey: ['todos'] })
+      return
+    }
+    inFlightIdsRef.current.add(id)
     mutation.mutate({ id, completed, description })
   }
 

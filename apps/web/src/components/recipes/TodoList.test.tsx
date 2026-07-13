@@ -99,7 +99,7 @@ describe('TodoList', () => {
       fireEvent.click(screen.getByRole('button', { name: /^Confirm deletion of/ }))
 
       expect(onDelete).toHaveBeenCalledTimes(1)
-      expect(onDelete).toHaveBeenCalledWith('b')
+      expect(onDelete).toHaveBeenCalledWith('b', 'render me first')
     })
 
     it('a pointerdown outside any armed affordance reverts to idle (AC 5)', async () => {

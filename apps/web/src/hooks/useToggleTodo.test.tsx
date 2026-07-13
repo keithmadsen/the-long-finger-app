@@ -134,6 +134,24 @@ describe('useToggleTodo', () => {
     expect(announce).toHaveBeenCalledWith('Done thing marked active.')
   })
 
+  it('uses the rendered description when the query cache misses, avoiding a silent visible-row no-op (Story 3.2 review)', async () => {
+    const client = createTestQueryClient()
+    const announce = vi.fn()
+    // The acted-on row is NOT in the cache — a stale action on a row a refetch
+    // has not represented, while the UI still has the rendered row description.
+    client.setQueryData<Todo[]>(['todos'], [
+      todo({ id: 'b', description: 'other', completed: false }),
+    ])
+    const fetchMock = stubFetch({ getList: () => [] })
+
+    const { result } = setup(client, announce)
+    act(() => result.current.toggle('a', true, 'Rendered row'))
+
+    await waitFor(() => expect(announce).toHaveBeenCalledTimes(1))
+    expect(fetchMock).toHaveBeenCalled()
+    expect(announce).toHaveBeenCalledWith('Rendered row marked complete.')
+  })
+
   it('on error reverts THIS row in place and invalidates to reconcile, announcing the failure once (AC 5)', async () => {
     const client = createTestQueryClient()
     const invalidateSpy = vi.spyOn(client, 'invalidateQueries')
@@ -150,7 +168,7 @@ describe('useToggleTodo', () => {
 
     await waitFor(() => expect(announce).toHaveBeenCalledTimes(1))
     expect(announce).toHaveBeenCalledWith(
-      'Couldn’t update “Buy milk”. The list refreshed to current state.',
+      'Couldn’t update ‘Buy milk’. The list refreshed to current state.',
     )
     // Confirmed data remains/reconciles to the backend-confirmed completed:false.
     expect(client.getQueryData<Todo[]>(['todos'])?.[0]?.completed).toBe(false)
