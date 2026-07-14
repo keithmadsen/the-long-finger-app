@@ -30,6 +30,27 @@ const staticRoot = existsSync(webDist) ? webDist : undefined;
 
 const app = await buildServer({ databasePath, staticRoot });
 
+// Graceful shutdown (Story 3.5): SIGTERM (docker stop / orchestrator) and
+// SIGINT (Ctrl-C) drain via app.close(), which runs the @fastify/awilix
+// disposeOnClose disposer → db.close() → better-sqlite3 checkpoints the WAL.
+// Guarded so a second signal during a slow close can't double-fire the close.
+// SIGKILL is untouched by design — crash recovery is proven separately (AC 3).
+let shuttingDown = false;
+function shutdown(signal: NodeJS.Signals): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  app.log.info({ signal }, 'received shutdown signal, closing');
+  app.close().then(
+    () => process.exit(0),
+    (err) => {
+      app.log.error(err);
+      process.exit(1);
+    },
+  );
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
 try {
   await app.listen({ port, host: '0.0.0.0' });
 } catch (err) {

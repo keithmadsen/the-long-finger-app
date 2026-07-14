@@ -47,12 +47,41 @@ export async function buildServer({
   });
 
   // Baseline security headers (X-Content-Type-Options, X-DNS-Prefetch-Control,
-  // Referrer-Policy, …) on the root app so they cover the API and, in prod, the
-  // static SPA layer too. CSP is intentionally DISABLED for v1: helmet's default
-  // CSP would block the bundled Vite SPA and the swagger-ui /docs assets.
-  // Hardened static-serving headers (strict CSP, COEP/CORP) are deferred to
-  // Epic 3 Story 3.5 (Story 1.11 AC 4). Registered before routes.
-  await app.register(helmet, { contentSecurityPolicy: false });
+  // Referrer-Policy, COOP/CORP, …) on the root app so they cover the API and,
+  // in prod, the static SPA layer too. Registered before routes.
+  //
+  // Strict CSP (Story 3.5 AC 1, deferred from Story 1.11 AC 4): the app is
+  // CSP-friendly by construction — the Vite build emits hashed external JS/CSS
+  // only (no inline scripts/styles), fonts are system-stack only, all fetches
+  // are same-origin relative. useDefaults:false + the full directive table
+  // keeps the whole policy visible here (helmet merges confusingly otherwise).
+  // vs helmet defaults: style-src/font-src/img-src tightened to 'self' (no
+  // 'unsafe-inline', https:, data:), frame-ancestors 'none' (nothing embeds
+  // this app; xFrameOptions DENY keeps the legacy header in agreement), and
+  // upgrade-insecure-requests omitted (the container serves plain HTTP — TLS
+  // termination is upstream/undefined at v1). Applied unconditionally: one
+  // behavior, one test surface. The swagger-ui /docs routes override this with
+  // their own staticCSP via an encapsulated onSend hook (see plugins/swagger.ts).
+  // COEP stays off (helmet default): nothing needs cross-origin isolation.
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        'default-src': ["'self'"],
+        'script-src': ["'self'"],
+        'script-src-attr': ["'none'"],
+        'style-src': ["'self'"],
+        'font-src': ["'self'"],
+        'img-src': ["'self'"],
+        'connect-src': ["'self'"],
+        'object-src': ["'none'"],
+        'base-uri': ["'self'"],
+        'form-action': ["'self'"],
+        'frame-ancestors': ["'none'"],
+      },
+    },
+    xFrameOptions: { action: 'deny' },
+  });
 
   await registerContainer(app, { databasePath });
 

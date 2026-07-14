@@ -37,13 +37,19 @@ export function registerErrorHandler(app: FastifyInstance): void {
     const statusCode =
       Number.isInteger(rawStatus) && rawStatus >= 400 && rawStatus <= 599 ? rawStatus : 500;
 
+    const code = codeForStatus(statusCode);
+    const message = statusCode >= 500 ? 'Internal Server Error' : (error.message || code);
+
     if (statusCode >= 500) {
       // Log the real error server-side; never expose it in the response body.
       request.log.error(error);
+    } else {
+      // Recoverable 4xx log at warn (Story 3.5 AC 4, the committed level
+      // table). Only safe fields: NEVER `error.validation` (it can embed the
+      // submitted value — the envelope may carry details to the client, but
+      // the log must not) and never the request body.
+      request.log.warn({ statusCode, code }, message);
     }
-
-    const code = codeForStatus(statusCode);
-    const message = statusCode >= 500 ? 'Internal Server Error' : (error.message || code);
 
     const envelope: ErrorEnvelope = {
       error: {
@@ -57,10 +63,16 @@ export function registerErrorHandler(app: FastifyInstance): void {
   });
 
   app.setNotFoundHandler((request, reply) => {
+    const message = `Route ${request.method}:${request.url} not found`;
+
+    // Same warn-level "recoverable" signal as the error handler's 4xx branch
+    // (Story 3.5 AC 4). Method/url only — never payload content.
+    request.log.warn({ statusCode: 404, code: 'NOT_FOUND' }, message);
+
     const envelope: ErrorEnvelope = {
       error: {
         code: 'NOT_FOUND',
-        message: `Route ${request.method}:${request.url} not found`,
+        message,
       },
     };
 
