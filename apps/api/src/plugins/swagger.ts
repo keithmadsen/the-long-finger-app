@@ -34,7 +34,13 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
     },
   });
 
+  // staticCSP: swagger-ui's assets need a looser policy than the app's strict
+  // global CSP (Story 3.5 AC 1). `true` makes the plugin compute its own
+  // self-contained policy and set it in an onSend hook registered inside this
+  // plugin's encapsulation context — it overrides helmet's header on /docs*
+  // routes ONLY; the strict global policy stays intact everywhere else.
   await app.register(fastifySwaggerUi, {
     routePrefix: '/docs',
+    staticCSP: true,
   });
 }

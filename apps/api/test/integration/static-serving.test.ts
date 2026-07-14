@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildServer } from '../../src/server.js';
+import { expectedAppCsp, parseCsp } from './helpers/csp.js';
 
 // Story 1.11 AC 3: when a staticRoot is supplied, Fastify serves the built SPA
 // AND the API from one origin. The static layer (wildcard:false) must NOT shadow
@@ -39,6 +40,13 @@ describe('static SPA serving alongside the API (AC 3)', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toContain('text/html');
     expect(res.body).toContain('The Long Finger');
+  });
+
+  it('GET / (the static index.html) carries the same strict CSP (Story 3.5 AC 1)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/' });
+    const header = res.headers['content-security-policy'];
+    expect(header).toBeDefined();
+    expect(parseCsp(String(header))).toEqual(expectedAppCsp);
   });
 
   it('GET /todos is NOT shadowed by static — still returns the JSON array', async () => {

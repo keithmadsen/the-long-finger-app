@@ -55,7 +55,12 @@ EXPOSE 8080
 # retains todos.db (+ the *.db-wal / *.db-shm WAL sidecars).
 VOLUME ["/data"]
 
-# Run the existing start script (= tsx src/index.ts). tsx executes the TS source
-# directly and resolves the @tlf/contracts TS-source workspace, so no api/contracts
-# build step is needed (apps/api tsconfig has noEmit; contracts ships TS source).
-CMD ["npm", "run", "start", "--workspace", "apps/api"]
+# Exec-form direct invocation so PID 1 is node itself (Story 3.5): npm as PID 1
+# does not reliably forward SIGTERM, so `docker stop` used to wait the full 10s
+# grace period and SIGKILL. `node --import tsx` is tsx v4's single-process
+# loader form (the `tsx` bin would re-spawn node as a child — same problem).
+# index.ts handles SIGTERM/SIGINT with app.close() (checkpoints the WAL) and is
+# cwd-independent: webDist resolves via import.meta.url, DATABASE_PATH is
+# absolute. tsx executes the TS source directly and resolves the @tlf/contracts
+# TS-source workspace, so no api/contracts build step is needed.
+CMD ["node", "--import", "tsx", "apps/api/src/index.ts"]
