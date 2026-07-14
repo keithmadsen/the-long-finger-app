@@ -52,8 +52,17 @@ EXPOSE 8080
 
 # SQLite durability across restarts (AC 5). connection.ts mkdir's the parent of
 # DATABASE_PATH, so a fresh /data volume initialises cleanly and a reused volume
-# retains todos.db (+ the *.db-wal / *.db-shm WAL sidecars).
+# retains todos.db (+ the *.db-wal / *.db-shm WAL sidecars). /data is created
+# and chowned BEFORE VOLUME so a fresh named volume inherits node-ownership —
+# required because the process runs as the non-root `node` user (uid 1000).
+RUN mkdir -p /data && chown node:node /data
 VOLUME ["/data"]
+USER node
+
+# Orchestrator-facing liveness: Node 24's global fetch against the API's own
+# /health route — node:24-slim ships no curl/wget, and this avoids adding one.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 8080) + '/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
 
 # Exec-form direct invocation so PID 1 is node itself (Story 3.5): npm as PID 1
 # does not reliably forward SIGTERM, so `docker stop` used to wait the full 10s
