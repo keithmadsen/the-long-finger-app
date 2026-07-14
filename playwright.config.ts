@@ -22,7 +22,9 @@ export default defineConfig({
   // Block a stray .only() from silently green-lighting a partial CI run.
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // 2 matches GitHub hosted-runner vCPUs; the suite is parallel-safe by design
+  // (random stamps + GET-scoping + self-cleaning seeds — see e2e/support).
+  workers: process.env.CI ? 2 : undefined,
   reporter: [
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['junit', { outputFile: 'test-results/results.xml' }],

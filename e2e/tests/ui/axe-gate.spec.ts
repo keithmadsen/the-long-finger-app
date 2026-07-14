@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import type { Page } from '@playwright/test'
 import { test, expect } from '../../support/ui-fixtures'
+import { randomStamp, scopeListTo } from '../../support/list-scoping'
 
 // Story 3.4 — the real-browser axe gate (AC 1/2, NFR3-E2E-002). Scans the same
 // six app states as the jsdom gate (apps/web/src/App.axe.test.tsx) but in a
@@ -14,23 +15,6 @@ import { test, expect } from '../../support/ui-fixtures'
 const WCAG_22_AA_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 
 const CAPTURE_PLACEHOLDER = 'What do you want to do?'
-
-/** A RANDOM token, not Date.now() (3.2 landmine — parallel workers collide). */
-const randomStamp = () => Math.random().toString(36).slice(2, 10)
-
-/** Scope GET /todos to rows containing `stamp` (3.1/3.2 precedent) — needed
- * where the STATE under scan depends on list-wide content (e.g. empty). */
-async function scopeListTo(page: Page, stamp: string) {
-  await page.route('**/todos', async (route) => {
-    if (route.request().method() !== 'GET') return route.fallback()
-    const response = await route.fetch()
-    const body = (await response.json()) as Array<{ description: string }>
-    await route.fulfill({
-      response,
-      body: JSON.stringify(body.filter((t) => t.description.includes(stamp))),
-    })
-  })
-}
 
 /** Run the WCAG 2.2 AA scan and fail with the full violation detail if any
  * serious/critical violation exists. */

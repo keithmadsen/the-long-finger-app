@@ -1,4 +1,5 @@
 import { test, expect, type NewTodo } from '../../support/ui-fixtures'
+import { randomStamp, scopeListTo } from '../../support/list-scoping'
 import type { Page } from '@playwright/test'
 
 // Story 3.3 — responsive, forced-colors, prefers-contrast, reduced-motion and
@@ -17,25 +18,6 @@ import type { Page } from '@playwright/test'
 
 const CAPTURE_PLACEHOLDER = 'What do you want to do?'
 
-// A RANDOM token per test, never Date.now(): parallel workers can share an
-// epoch millisecond, which defeats description-scoped filters (3.2 precedent).
-const randomToken = () => Math.random().toString(36).slice(2, 10)
-
-// The harness runs fully parallel against ONE shared e2e DB: geometry/order
-// assertions need a deterministic list, so scope GET /todos responses to this
-// spec's seeded rows (3.1/3.2 precedent). Mutations still hit the real server.
-async function scopeListTo(page: Page, token: string) {
-  await page.route('**/todos', async (route) => {
-    if (route.request().method() !== 'GET') return route.fallback()
-    const response = await route.fetch()
-    const body = (await response.json()) as Array<{ description: string }>
-    await route.fulfill({
-      response,
-      body: JSON.stringify(body.filter((t) => t.description.includes(token))),
-    })
-  })
-}
-
 const row = (page: Page, description: string) =>
   page.getByRole('listitem').filter({ hasText: description })
 
@@ -50,7 +32,7 @@ test.describe('forced-colors gate (Story 3.3, AC 3)', () => {
     seedTodos,
     apiRequest,
   }) => {
-    const stamp = randomToken()
+    const stamp = randomStamp()
     const activeName = `fc active ${stamp}`
     const doneName = `fc done ${stamp}`
     const [active, done] = await seedTodos([
@@ -172,7 +154,7 @@ test.describe('reduced-motion gate (Story 3.3, AC 5)', () => {
     page,
     seedTodos,
   }) => {
-    const stamp = randomToken()
+    const stamp = randomStamp()
     const name = `rm row ${stamp}`
     await seedTodos([{ description: name }])
 
@@ -254,7 +236,7 @@ test.describe('responsive + 200%-zoom + reflow gates (Story 3.3, AC 1, 2, 6)', (
     page,
     seedTodos,
   }) => {
-    const stamp = randomToken()
+    const stamp = randomStamp()
     const shortName = `zoom short ${stamp}`
     // Worst case for overflow: the contract-max 200-char description with a
     // long unbroken tail (no wrap opportunities — the 2-line clamp must clip).
@@ -290,7 +272,7 @@ test.describe('responsive + 200%-zoom + reflow gates (Story 3.3, AC 1, 2, 6)', (
     page,
     seedTodos,
   }) => {
-    const stamp = randomToken()
+    const stamp = randomStamp()
     const name = `mobile row ${stamp}`
     await seedTodos([{ description: name }])
 
@@ -325,7 +307,7 @@ test.describe('responsive + 200%-zoom + reflow gates (Story 3.3, AC 1, 2, 6)', (
     page,
     seedTodos,
   }) => {
-    const stamp = randomToken()
+    const stamp = randomStamp()
     const name = `desktop row ${stamp}`
     await seedTodos([{ description: name }])
 
@@ -383,7 +365,7 @@ test.describe('responsive + 200%-zoom + reflow gates (Story 3.3, AC 1, 2, 6)', (
     page,
     seedTodos,
   }) => {
-    const stamp = randomToken()
+    const stamp = randomStamp()
     const seeded = await seedTodos([
       { description: `reflow one ${stamp}` },
       { description: `reflow two ${stamp}` },
@@ -442,7 +424,7 @@ test.describe('prefers-contrast gate (Story 3.3, AC 4)', () => {
     seedTodos,
     apiRequest,
   }) => {
-    const stamp = randomToken()
+    const stamp = randomStamp()
     const activeName = `pc active ${stamp}`
     const doneName = `pc done ${stamp}`
     const [, done] = await seedTodos([
@@ -486,7 +468,7 @@ test.describe('text-spacing gate (Story 3.4, WCAG 1.4.12)', () => {
     page,
     seedTodos,
   }) => {
-    const stamp = randomToken()
+    const stamp = randomStamp()
     const shortName = `spacing short ${stamp}`
     // Worst case for overflow: the contract-max 200-char description with an
     // unbroken tail (zoom-gate precedent) — wider letter/word spacing makes

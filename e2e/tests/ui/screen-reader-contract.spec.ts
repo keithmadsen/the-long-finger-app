@@ -1,4 +1,5 @@
 import { test, expect } from '../../support/ui-fixtures'
+import { randomStamp, scopeListTo } from '../../support/list-scoping'
 
 // Story 3.2 — the consolidated screen-reader contract in a REAL browser (@p1).
 // jsdom can assert the DOM mechanics of announcements but not a real render
@@ -22,10 +23,7 @@ test.describe('screen-reader contract (Story 3.2)', () => {
     apiRequest,
   }) => {
     // Distinct, non-substring descriptions so hasText filters stay unambiguous.
-    // A RANDOM token, not Date.now(): two parallel specs can start in the same
-    // millisecond, and identical epoch stamps would defeat both specs' GET
-    // scoping filters (each would see the other's rows).
-    const stamp = Math.random().toString(36).slice(2, 10)
+    const stamp = randomStamp()
     const dupName = `sr dup ${stamp}`
     const toggleName = `sr toggle target ${stamp}`
     await seedTodos([
@@ -34,21 +32,9 @@ test.describe('screen-reader contract (Story 3.2)', () => {
       { description: toggleName },
     ])
 
-    // The harness runs fully parallel against ONE shared e2e DB (3.1
-    // precedent): scope GET /todos responses to this spec's rows so the
-    // list-wide count assertions hold; every mutation still hits the real
-    // server and the real refetch cycle drives the UI.
-    await page.route('**/todos', async (route) => {
-      if (route.request().method() !== 'GET') return route.fallback()
-      const response = await route.fetch()
-      const body = (await response.json()) as Array<{ description: string }>
-      await route.fulfill({
-        response,
-        body: JSON.stringify(
-          body.filter((t) => t.description.includes(`${stamp}`)),
-        ),
-      })
-    })
+    // List-wide count assertions need a deterministic list — scope the READ
+    // to this spec's rows against the shared parallel e2e DB.
+    await scopeListTo(page, stamp)
 
     await page.goto('/')
     await expect(page.getByRole('listitem')).toHaveCount(3)
@@ -59,71 +45,75 @@ test.describe('screen-reader contract (Story 3.2)', () => {
     await expect(page.locator('[aria-live]')).toHaveCount(1)
     await expect(region).toHaveAttribute('aria-live', 'polite')
 
-    // AC 2 — create confirm lands "{description} added." in the region.
+    // AC 2 — create confirm lands "{description} added." in the region. The
+    // row is UI-created, so from here cleanup must run even on a failed
+    // assertion (delete-path precedent): try/finally, not inline at the end.
     const createdName = `sr created ${stamp}`
-    const input = page.getByPlaceholder(CAPTURE_PLACEHOLDER)
-    await input.fill(createdName)
-    await input.press('Enter')
-    await expect(region).toContainText(`${createdName} added.`)
+    try {
+      const input = page.getByPlaceholder(CAPTURE_PLACEHOLDER)
+      await input.fill(createdName)
+      await input.press('Enter')
+      await expect(region).toContainText(`${createdName} added.`)
 
-    // AC 1/2 — a slowed PATCH holds the row aria-busy until settle; the toggle
-    // announcement fires on backend confirm, never on submit.
-    const delayedPatch = interceptNetworkCall({
-      method: 'PATCH',
-      url: '/todos/*',
-      handler: async (route) => {
-        await new Promise((resolve) => setTimeout(resolve, 800))
-        await route.continue()
-      },
-    })
-    const toggleRow = page.getByRole('listitem').filter({ hasText: toggleName })
-    // Drive the visible label — the real input hides behind a styled indicator.
-    await toggleRow.locator('label').click()
-    await expect(toggleRow).toHaveAttribute('aria-busy', 'true')
-    // Pending is silent: the region still holds the create confirmation.
-    expect(await region.textContent()).not.toContain('marked complete.')
-    await delayedPatch
-    await expect(region).toContainText(`${toggleName} marked complete.`)
-    // Settled: React removes aria-busy={false} from the DOM entirely.
-    await expect(toggleRow).not.toHaveAttribute('aria-busy', 'true')
+      // AC 1/2 — a slowed PATCH holds the row aria-busy until settle; the toggle
+      // announcement fires on backend confirm, never on submit.
+      const delayedPatch = interceptNetworkCall({
+        method: 'PATCH',
+        url: '/todos/*',
+        handler: async (route) => {
+          await new Promise((resolve) => setTimeout(resolve, 800))
+          await route.continue()
+        },
+      })
+      const toggleRow = page.getByRole('listitem').filter({ hasText: toggleName })
+      // Drive the visible label — the real input hides behind a styled indicator.
+      await toggleRow.locator('label').click()
+      await expect(toggleRow).toHaveAttribute('aria-busy', 'true')
+      // Pending is silent: the region still holds the create confirmation.
+      expect(await region.textContent()).not.toContain('marked complete.')
+      await delayedPatch
+      await expect(region).toContainText(`${toggleName} marked complete.`)
+      // Settled: React removes aria-busy={false} from the DOM entirely.
+      await expect(toggleRow).not.toHaveAttribute('aria-busy', 'true')
 
-    // AC 2/5 — two identical consecutive deletes: the second announcement is a
-    // fresh, observable DOM mutation (nonce alternation) with the same copy.
-    const dupRows = page.getByRole('listitem').filter({ hasText: dupName })
-    const armAndConfirmFirstDup = async () => {
-      await dupRows
-        .first()
-        .getByRole('button', { name: `Delete '${dupName}'` })
-        .click()
-      await page.waitForTimeout(350) // cross the 300 ms no-commit window
-      await dupRows
-        .first()
-        .getByRole('button', { name: /^Confirm deletion of/ })
-        .click()
-    }
+      // AC 2/5 — two identical consecutive deletes: the second announcement is a
+      // fresh, observable DOM mutation (nonce alternation) with the same copy.
+      const dupRows = page.getByRole('listitem').filter({ hasText: dupName })
+      const armAndConfirmFirstDup = async () => {
+        await dupRows
+          .first()
+          .getByRole('button', { name: `Delete '${dupName}'` })
+          .click()
+        await page.waitForTimeout(350) // cross the 300 ms no-commit window
+        await dupRows
+          .first()
+          .getByRole('button', { name: /^Confirm deletion of/ })
+          .click()
+      }
 
-    await armAndConfirmFirstDup()
-    await expect(region).toContainText(`${dupName} deleted.`)
-    await expect(dupRows).toHaveCount(1)
-    const firstAnnouncement = await region.textContent()
+      await armAndConfirmFirstDup()
+      await expect(region).toContainText(`${dupName} deleted.`)
+      await expect(dupRows).toHaveCount(1)
+      const firstAnnouncement = await region.textContent()
 
-    await armAndConfirmFirstDup()
-    await expect(dupRows).toHaveCount(0)
-    await expect
-      .poll(() => region.textContent(), { timeout: 10_000 })
-      .not.toBe(firstAnnouncement)
-    expect(((await region.textContent()) ?? '').replace(ZERO_WIDTH_NONCE, '')).toBe(
-      `${dupName} deleted.`,
-    )
-
-    // Self-cleaning: the UI-created row's client-generated id is unknown, so
-    // reconcile against the API and delete by description (smoke-spec pattern).
-    const { body } = await apiRequest<Array<{ id: string; description: string }>>({
-      method: 'GET',
-      path: '/todos',
-    })
-    for (const row of body.filter((t) => t.description === createdName)) {
-      await apiRequest({ method: 'DELETE', path: `/todos/${row.id}` })
+      await armAndConfirmFirstDup()
+      await expect(dupRows).toHaveCount(0)
+      await expect
+        .poll(() => region.textContent(), { timeout: 10_000 })
+        .not.toBe(firstAnnouncement)
+      expect(((await region.textContent()) ?? '').replace(ZERO_WIDTH_NONCE, '')).toBe(
+        `${dupName} deleted.`,
+      )
+    } finally {
+      // Self-cleaning: the UI-created row's client-generated id is unknown, so
+      // reconcile against the API and delete by description (smoke-spec pattern).
+      const { body } = await apiRequest<Array<{ id: string; description: string }>>({
+        method: 'GET',
+        path: '/todos',
+      })
+      for (const row of body.filter((t) => t.description === createdName)) {
+        await apiRequest({ method: 'DELETE', path: `/todos/${row.id}` })
+      }
     }
   })
 })

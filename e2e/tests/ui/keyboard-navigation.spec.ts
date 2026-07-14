@@ -1,4 +1,5 @@
 import { test, expect } from '../../support/ui-fixtures'
+import { randomStamp, scopeListTo } from '../../support/list-scoping'
 
 // Story 3.1 — list-wide keyboard navigation in a REAL browser (@p1, the
 // NFR3-E2E-001 slice: keyboard-only create/toggle/delete reachable & operable).
@@ -18,7 +19,7 @@ test.describe('list-wide keyboard navigation (Story 3.1)', () => {
     seedTodos,
   }) => {
     // Distinct, non-substring descriptions so hasText filters stay unambiguous.
-    const stamp = Date.now()
+    const stamp = randomStamp()
     const seeded = await seedTodos([
       { description: `kb nav row one ${stamp}` },
       { description: `kb nav row two ${stamp}` },
@@ -28,22 +29,9 @@ test.describe('list-wide keyboard navigation (Story 3.1)', () => {
     if (!rowOne || !rowTwo || !rowThree) throw new Error('seeding failed')
 
     // Keyboard navigation is about list-wide ORDER and ADJACENCY, so unlike the
-    // per-row smoke assertions this spec needs a deterministic list — but the
-    // harness runs fully parallel against one shared e2e database. Scope the
-    // READ to this spec's rows: GET /todos responses are filtered to the seeded
-    // stamp while every mutation (PATCH/DELETE) still hits the real server and
-    // the real refetch cycle drives the UI.
-    await page.route('**/todos', async (route) => {
-      if (route.request().method() !== 'GET') return route.fallback()
-      const response = await route.fetch()
-      const body = (await response.json()) as Array<{ description: string }>
-      await route.fulfill({
-        response,
-        body: JSON.stringify(
-          body.filter((t) => t.description.includes(`${stamp}`)),
-        ),
-      })
-    })
+    // per-row smoke assertions this spec needs a deterministic list — scope the
+    // READ to this spec's seeded rows against the shared parallel e2e DB.
+    await scopeListTo(page, stamp)
 
     // Canonical order is completed ASC, updated_at DESC — the LAST seeded row
     // renders FIRST: [three, two, one].
