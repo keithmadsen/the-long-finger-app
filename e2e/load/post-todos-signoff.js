@@ -50,6 +50,9 @@ export const options = {
   thresholds: {
     // NFR-1 (prd.md §7): p50 ≤ 100 ms / p95 ≤ 800 ms on the POST path.
     'http_req_duration{type:create}': [`p(50)<${P50_MS}`, `p(95)<${P95_MS}`],
+    // A constant-arrival-rate executor can otherwise stay green after maxVUs
+    // saturation silently drops part of the promised 600-request profile.
+    dropped_iterations: ['count==0'],
     // Every measured create must actually succeed — latency percentiles over
     // failed requests would be meaningless.
     checks: ['rate==1'],

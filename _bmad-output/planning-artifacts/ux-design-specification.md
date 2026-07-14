@@ -348,7 +348,7 @@ The defining interaction succeeds when:
 - **A typed task never silently fails.** A failed create surfaces a clear error, preserves the typed text, and offers retry. A confirmed task never reverts. The list reflects the backend's truth, always.
 - **A keyboard-only user reaches and operates the input with no navigation.** Tab order is: input first. Enter submits. Esc clears pending input if the user changes their mind before submit.
 - **A screen-reader user hears their submission acknowledged.** The newly added item is announced via the single persistent polite live region (`<LiveRegion>` primitive). Pending → confirmed transitions do not generate additional announcements.
-- **The pending cue is detectable but calm — measured.** The pending state maintains contrast ≥3:1 against the settled state (e.g., the pending row uses `--color-on-surface-muted` against the settled `--color-on-surface`). Validated by an SM-1 acceptance step: *"After submitting, the participant identifies whether the item is fully saved or still saving, without prompting, within 3 seconds."*
+- **The pending cue is detectable but calm — measured.** The pending state maintains contrast ≥3:1 against the settled state using the dedicated `--color-pending` token against `--color-on-surface`. Validated by an SM-1 acceptance step: *"After submitting, the participant identifies whether the item is fully saved or still saving, without prompting, within 3 seconds."*
 
 ### 2.4 Novel vs. Established Patterns
 
@@ -458,13 +458,14 @@ Light theme only in v1, committed values. Dark mode deferred; the semantic token
 | `--color-surface-muted` | `#F0EFEA` | Subtle separators, empty-state surface, hover backgrounds. |
 | `--color-surface-hover` | `#F5F4EF` | Desktop hover state on interactive rows. ~2% darker than surface. |
 | `--color-on-surface` | `#1A1A18` | Active item text, primary text. Near-black with warmth. |
-| `--color-on-surface-muted` | `#5A5954` | Completed item text, pending text, secondary text. Reaches AAA contrast on surface and AA on surface-muted. |
+| `--color-on-surface-muted` | `#5A5954` | Completed item text and secondary text. Reaches AA contrast on surface and surface-muted. |
+| `--color-pending` | `#6E6D67` | Pending-row text only; ≥3:1 distinct from settled text and ≥4.5:1 on surface. |
 
 **Borders, dividers, accents — restrained.**
 
 | Token | Value | Use |
 |---|---|---|
-| `--color-border` | `#DDDCD5` | Form-control borders (TextInput, Checkbox). |
+| `--color-border` | `#888781` | Form-control borders (TextInput, Checkbox); ≥3:1 on surface and muted surface. |
 | `--color-divider` | `#E4E2DC` | Between-row rules. Barely-there, pencil-guide weight. |
 | `--color-accent` | `#3D5A80` | Affordance (links, retry action). Muted slate blue. |
 | `--color-focus` | `#3D5A80` | Focus ring. Declared separately from `--color-accent` to allow per-component override and future divergence. Default value matches accent. |
@@ -477,17 +478,20 @@ Light theme only in v1, committed values. Dark mode deferred; the semantic token
 | Pair | Ratio | Notes |
 |---|---|---|
 | `--color-on-surface` on `--color-surface` | ~16:1 | WCAG AAA body, AAA UI. |
-| `--color-on-surface-muted` on `--color-surface` | ~7.1:1 | WCAG AAA body — primary-text-grade. |
-| `--color-on-surface-muted` on `--color-surface-muted` | ~4.7:1 | WCAG AA body. |
+| `--color-on-surface-muted` on `--color-surface` | ~6.7:1 | WCAG AA body. |
+| `--color-on-surface-muted` on `--color-surface-muted` | ~6.1:1 | WCAG AA body. |
 | `--color-accent` on `--color-surface` | ~8.5:1 | Focus ring + affordance — strongly visible. |
 | `--color-error` on `--color-surface` | ~6.8:1 | WCAG AA body. |
-| `--color-on-surface-muted` vs `--color-on-surface` (luminance delta against shared surface) | computed at CI time, must remain visually ≥3:1 | Pending vs settled — see CI gate below. |
+| `--color-pending` vs `--color-on-surface` | ~3.4:1 | Pending vs settled — CI-gated. |
+| `--color-pending` on `--color-surface` | ~5.0:1 | Pending text remains AA-legible. |
+| `--color-focus` on `--color-surface` | ≥3:1 | Focus-ring non-text contrast. |
+| `--color-border` on `--color-surface` and `--color-surface-muted` | ≥3:1 | TextInput/Checkbox control boundaries. |
 
 ### Pending State Visual Treatment
 
 A pending row uses:
 
-- Text color: `--color-on-surface-muted` (replaces `--color-on-surface`).
+- Text color: `--color-pending` (replaces `--color-on-surface`).
 - No spinner, no shimmer, no italic, no position shift.
 - No size or font-weight change.
 
@@ -780,7 +784,7 @@ Tapping anywhere on the row (except the `Delete` affordance) toggles the item's 
 - The `Delete` affordance is a sibling `<button>` inside the row whose click handler calls `e.stopPropagation()` so the click does not bubble to the row toggle.
 - Visual is unchanged from prior commitments — the checkbox is still the primary visual affordance. Only the click target expands to the full row.
 
-**Task text overflow.** Row height is `--row-height-touch` (48 px) for tasks fitting on one line, and grows to accommodate up to **two lines** of text. Beyond two lines, text truncates with `…` (`text-overflow: ellipsis` + `line-clamp: 2`). Tasks longer than ~60–90 characters (varying with viewport width and font metrics) are partially hidden; users who need the full text must delete-and-retype shorter. The PRD's 200-character limit is enforced at submit but not displayed in full above the two-line threshold. *(See PRD Ripple Effects below.)*
+**Task text overflow.** Row height is `--row-height-touch` (48 px) for tasks fitting on one line and grows as needed to expose the complete description. Long unbroken text uses `overflow-wrap: anywhere`, so the 200-character contract maximum remains visible without horizontal page scrolling. This also preserves content under WCAG 1.4.12 user text-spacing overrides.
 
 **Long-press and swipe behaviour.** Long-press on a row triggers the browser's native text-selection menu; the spec does not override this (text selection is correct behaviour for plain task text and supports copy-paste). Swipe gestures do nothing — swipe-to-delete and other swipe-based actions were explicitly rejected as anti-patterns in Step 5. Both behaviours are correct by default; documenting them prevents accidental override during implementation.
 
@@ -832,16 +836,7 @@ Suggested PRD text:
 
 > Completed items are visually de-emphasised in place during a session, and sorted below active items on next page load. The canonical order is `completed` first (false before true), then `updatedAt` descending.
 
-**Ripple 2 — visible character limit shorter than enforced submit limit.**
-
-Decision 6's two-line truncation means tasks longer than ~60–90 characters are partially hidden in the rendered list, even though the PRD's submit limit is 200 characters. Two paths to resolution; the PRD should pick one:
-
-- Option A — accept the discrepancy: the visible display is two lines (~60–90 chars depending on viewport), with `…` for overflow; the submit limit remains 200 characters. The PRD acknowledges that practical readability is shorter than enforced length.
-- Option B — tighten the submit limit to match the visible threshold: lower the PRD limit to e.g. 100 characters, which fits in two lines on most viewports without truncation.
-
-Recommendation: **Option A.** Users with longer tasks can still create them (use case: a paste-from-elsewhere note); the truncation is a readability convention, not a data-loss event. Edge-case users who need the full text can refresh, scroll, or accept the truncation.
-
-Both ripples should be picked up before story creation begins (Step 4-implementation phase).
+The earlier visible-limit ripple is resolved: descriptions now expand to show the full 200-character contract maximum, so no PRD character-limit amendment is required.
 
 ## User Journey Flows
 
@@ -853,7 +848,7 @@ All flows are variations on PRD UJ-1 ("Primary User manages a personal Todo List
 
 The journey-level success criteria (e.g., SM-1's 5-second time-to-first-task) depend on performance budgets that bind the implementation:
 
-- **Time-to-interactive (TTI) ≤ 1 second** on slow 3G (~400 ms RTT, ~400 Kbps down). The page must render the input (focused, interactive) and the empty-state instruction within this budget. The system-font stack and no-third-party-library decisions (Step 6) are critical to meeting this; any future addition that delays first paint must show the TTI budget still holds.
+- **Time-to-usable-list ≤ 10 seconds** on slow 3G (~400 ms RTT, ~400 Kbps down), approved by Keith on 2026-07-14 from the measured 7,839 ms production-container baseline. The page must render the interactive input and list/empty-state surface within this budget. The 95,000 B gzip ceiling is the merge-blocking regression proxy; the throttled browser measurement is release evidence.
 - **p50 submit latency ≤ 100 ms; p95 ≤ 800 ms.** Committed in Step 7 §2.5. These bound the pending-cue exposure rate.
 - **Initial GET latency ≤ 800 ms (p95).** Same budget as submit. Bounds the "Loading…" state's exposure window.
 
@@ -1201,7 +1196,7 @@ The component layer has two tiers:
 | `<UnreadErrorIndicator>` | Focusable button aligned right of `<CaptureInput>` showing `"N error(s) above"`; on Enter, scrolls to first failed row + moves focus | Hidden when no failures; visible when ≥1; clears on resolution | Step 7 §2.5; Decision 2; Journey 5 |
 | `<EmptyState>` | Composes the instruction line (above input, conditional), state line (below input, always), and dashed divider (only when truly empty) | First-open / returning-empty / loading / load-failed | Step 8 + Decision 3 + Journey 0 |
 | `<TodoList>` | Ordered list of `<TodoItem>` instances; owns the canonical-order render on fresh GET + in-place rule during session; coordinates the single-row-armed-delete state | Empty / populated / loading | Decision 1; Journey 4 hardening |
-| `<TodoItem>` | The row — composes `<Checkbox>` + text + delete affordance; owns the whole-row tap target (wrapping `<label>`); 2-line ellipsis truncation; pending/failed/armed visual variants | See state machine below | Steps 6–10 throughout |
+| `<TodoItem>` | The row — composes `<Checkbox>` + text + delete affordance; owns the whole-row tap target (wrapping `<label>`); complete responsive text wrapping; pending/failed/armed visual variants | See state machine below | Steps 6–10 throughout |
 | `<DeleteAffordance>` | Inline two-step Delete → Confirm button inside `<TodoItem>` right side; owns 300 ms no-commit window + 5 s auto-revert + `aria-pressed` armed-state + accessible-name change | `idle` / `armed-no-commit` / `armed` / `committing` | Decision 5; Journey 4 |
 
 ### Component Spec — `<TodoItem>` (the most complex recipe)
@@ -1469,7 +1464,7 @@ Specific verifications:
 
 Already committed in Step 7 and Step 10. Consolidating:
 
-- TTI ≤ 1 s on slow 3G.
+- Time-to-usable-list ≤ 10 s on slow 3G.
 - p50 submit latency ≤ 100 ms; p95 ≤ 800 ms.
 - Wall-clock pending timeout (10 s) survives laptop sleep / tab backgrounding.
 - No offline mode (NG-5); failed creates do not persist across reload.

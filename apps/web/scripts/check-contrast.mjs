@@ -32,10 +32,12 @@ import { readFileSync } from 'node:fs'
 
 const TOKENS_FILE = new URL('../src/styles/tokens.css', import.meta.url).pathname
 
-/** Parse `--name: #hex;` color custom properties from tokens.css. */
+/** Parse opaque `--name: #rgb|#rrggbb;` properties from tokens.css.
+ * Alpha colors are deliberately rejected: ignoring their alpha channel could
+ * let a transparent focus/control boundary pass its sole contrast gate. */
 function readColorTokens(css) {
   const tokens = {}
-  const re = /(--[a-z0-9-]+)\s*:\s*(#[0-9a-fA-F]{3,8})\s*;/g
+  const re = /(--[a-z0-9-]+)\s*:\s*(#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}))\s*;/g
   let match
   while ((match = re.exec(css)) !== null) {
     tokens[match[1]] = match[2]
@@ -142,6 +144,18 @@ const PAIRS = [
     bg: '--color-surface',
     target: 3,
     label: 'focus ring on surface (non-text ≥3:1 — WCAG 1.4.11)',
+  },
+  {
+    fg: '--color-border',
+    bg: '--color-surface',
+    target: 3,
+    label: 'control boundary on surface (non-text ≥3:1 — WCAG 1.4.11)',
+  },
+  {
+    fg: '--color-border',
+    bg: '--color-surface-muted',
+    target: 3,
+    label: 'control boundary on muted surface (non-text ≥3:1 — WCAG 1.4.11)',
   },
 ]
 

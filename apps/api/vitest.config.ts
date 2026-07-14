@@ -15,10 +15,10 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/routes/todos.route.ts', 'src/repositories/todo.repository.ts'],
       thresholds: {
-        statements: 80,
-        branches: 80,
-        functions: 80,
-        lines: 80,
+        statements: 80.01,
+        branches: 80.01,
+        functions: 80.01,
+        lines: 80.01,
       },
     },
     projects: [

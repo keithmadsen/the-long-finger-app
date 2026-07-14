@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-16
-last_updated: 2026-07-14  # 3-4 → review (dev-story complete)
+last_updated: 2026-07-14  # 3-4 → done (code-review patches complete)
 # 2026-07-14: 3-4 → ready-for-dev (create-story + post-3.3-merge review)
 # 2026-07-14: 3-4 → in-progress (dev-story)
 # 2026-07-14: 3-4 → review (dev-story complete); k6 sign-off PASS (p50 2.85ms/p95 6.34ms); TTI slow-3G budget MISS on record (7.8s — container serves uncompressed assets; decision pending, see docs/k6-latency-signoff.md); WCAG matrix landed with 1.4.12 + 1.4.11 gaps closed
@@ -147,6 +147,6 @@ development_status:
   3-1-list-wide-keyboard-navigation: done
   3-2-consolidated-screen-reader-contract: done
   3-3-responsive-forced-colors-reduced-motion-verification: done
-  3-4-expanded-ci-quality-gates-wcag-conformance: review
+  3-4-expanded-ci-quality-gates-wcag-conformance: done
   3-5-hardened-production-deploy: backlog
   epic-3-retrospective: optional

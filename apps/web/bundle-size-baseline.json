@@ -1,4 +1,4 @@
 {
   "ceilingGzipBytes": 95000,
-  "rationale": "Absolute ceiling (Story 3.4, AC 5): freeze ~2.5 KB above the 92,498 B gz measured after Story 3.3 as the NFR-2 regression stop. NOT derived from the slow-3G TTI budget — at ~50 KB/s that math cannot produce a ceiling this bundle already satisfies (see docs/k6-latency-signoff.md, TTI section). Raising this number is a deliberate PR decision; the check script has no --update shortcut by design."
+  "rationale": "Absolute ceiling (Story 3.4, AC 5): freeze ~2.5 KB above the 92,498 B gz measured after Story 3.3 as the NFR-2 regression proxy for Keith's approved ≤10 s slow-3G time-to-usable budget (recorded evidence: 7,839 ms). Raising this number is a deliberate PR decision; the check script has no --update shortcut by design."
 }
