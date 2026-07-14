@@ -34,22 +34,26 @@ test.describe('core loop smoke', () => {
 
     await page.goto('/')
 
-    const input = page.getByPlaceholder(CAPTURE_PLACEHOLDER)
-    await expect(input).toBeFocused() // capture is sacred — first interactive element, autofocused
-    await input.fill(description)
-    await input.press('Enter')
+    try {
+      const input = page.getByPlaceholder(CAPTURE_PLACEHOLDER)
+      await expect(input).toBeFocused() // capture is sacred — first interactive element, autofocused
+      await input.fill(description)
+      await input.press('Enter')
 
-    // The new row appears (honest-pending settles once the backend confirms).
-    await expect(page.getByRole('checkbox', { name: description })).toBeVisible()
-
-    // Self-cleaning: this row was created through the UI with a client-owned id
-    // we don't hold, so reconcile against the API and delete by description.
-    const { body } = await apiRequest<Array<{ id: string; description: string }>>({
-      method: 'GET',
-      path: '/todos',
-    })
-    for (const row of body.filter((t) => t.description === description)) {
-      await apiRequest({ method: 'DELETE', path: `/todos/${row.id}` })
+      // The new row appears (honest-pending settles once the backend confirms).
+      await expect(page.getByRole('checkbox', { name: description })).toBeVisible()
+    } finally {
+      // Self-cleaning even when an assertion fails (the row would otherwise
+      // leak into the shared e2e DB — the dev DB locally): this row was
+      // created through the UI with a client-owned id we don't hold, so
+      // reconcile against the API and delete by description.
+      const { body } = await apiRequest<Array<{ id: string; description: string }>>({
+        method: 'GET',
+        path: '/todos',
+      })
+      for (const row of body.filter((t) => t.description === description)) {
+        await apiRequest({ method: 'DELETE', path: `/todos/${row.id}` })
+      }
     }
   })
 })

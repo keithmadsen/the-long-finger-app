@@ -793,6 +793,10 @@ describe('App delete (Story 2.2)', () => {
   })
 
   afterEach(() => {
+    // Tests below install fake timers mid-test and restore inline; a failed
+    // assertion in between would otherwise leave fake timers active and
+    // cascade into every later test (waitFor never advances).
+    vi.useRealTimers()
     vi.unstubAllGlobals()
   })
 

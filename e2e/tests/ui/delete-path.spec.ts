@@ -1,4 +1,5 @@
 import { test, expect } from '../../support/ui-fixtures'
+import { randomStamp, scopeListTo } from '../../support/list-scoping'
 
 // Story 3.4 — the committed @p0 delete-path regression net (closes deferred
 // Epic 1 action item 6 + deferred Story 1.7 AC 10). The P0 delete interaction
@@ -17,25 +18,6 @@ import { test, expect } from '../../support/ui-fixtures'
 // the row <label>, never checkbox.check().
 
 const CAPTURE_PLACEHOLDER = 'What do you want to do?'
-
-/** Scope GET /todos to this spec's rows (3.1/3.2 precedent): the harness runs
- * fully parallel against ONE shared e2e DB, so list-wide count assertions need
- * a filter. Mutations still hit the real server; only the READ is scoped. */
-async function scopeListTo(page: import('@playwright/test').Page, stamp: string) {
-  await page.route('**/todos', async (route) => {
-    if (route.request().method() !== 'GET') return route.fallback()
-    const response = await route.fetch()
-    const body = (await response.json()) as Array<{ description: string }>
-    await route.fulfill({
-      response,
-      body: JSON.stringify(body.filter((t) => t.description.includes(stamp))),
-    })
-  })
-}
-
-/** A RANDOM token, not Date.now(): parallel workers can start in the same
- * millisecond, and identical epoch stamps defeat both specs' GET scoping. */
-const randomStamp = () => Math.random().toString(36).slice(2, 10)
 
 const deleteButton = (row: import('@playwright/test').Locator, description: string) =>
   row.getByRole('button', { name: `Delete '${description}'` })
