@@ -1,6 +1,10 @@
+---
+baseline_commit: 8e6f0d3595ca80454bc113d7f4528eb7f80eecc1
+---
+
 # Story 3.4: Expanded CI quality gates & WCAG conformance
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -29,39 +33,39 @@ Verbatim from epics.md § Story 3.4, annotated with the scope decisions Keith lo
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: CI `e2e` job (AC 1, 6)
-  - [ ] Add a second job (e.g. `e2e`) to `.github/workflows/ci.yml`, parallel to `verify`: checkout, setup-node Node 24 + npm cache, `npm ci`, `npx playwright install --with-deps chromium`, `npm run test:e2e`. Shape is pre-specified in `e2e/README.md:97-102`. Do NOT cache Playwright browsers (Playwright docs: restore ≈ download time, OS deps uncacheable).
-  - [ ] Failure-artifact upload of `test-results/` + `playwright-report/` via `actions/upload-artifact` with `if: ${{ !cancelled() }}` and a retention period.
-  - [ ] The job runs the full suite (`npm run test:e2e`, no `--grep`/`--project` filter): both projects (api + chromium), which includes 3.3's merged `a11y-modes.spec.ts` gates — wiring this job is what makes those WCAG gates merge-blocking.
-  - [ ] Update the stale header comment at `.github/workflows/ci.yml:8-13` ("Playwright … gates remain deferred to Epic 3" — 3.3 deliberately left it for this story) and the `e2e/README.md:97-102` "Story 3.4 will add…" paragraph to describe reality.
-- [ ] Task 2: committed @p0 delete-path e2e specs (AC 6; closes deferred Epic 1 item 6 + deferred 1.7 AC 10)
-  - [ ] New spec file under `e2e/tests/ui/` covering: arm→confirm→revert delete; 5s auto-revert (real Playwright timers — do NOT fake the timer under test); concurrent arm/submit. Use `waitForResponse`/`interceptNetworkCall` for determinism, tag `@p0`.
-  - [ ] Follow the shared-parallel-DB conventions (Dev Notes § E2E landmines): `page.route` GET-scoping filter + random token (never `Date.now()`).
-- [ ] Task 3: real-browser axe gate via `@axe-core/playwright` (AC 1, 2 — NFR3-E2E-002)
-  - [ ] Add root devDep `@axe-core/playwright@^4.12.1` (matches the repo's existing `axe-core` 4.12.1; peer-compatible with `@playwright/test` 1.61.x).
-  - [ ] New e2e spec (chromium project) scanning the rendered app states with the **full cumulative tag array** `['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']` — axe tags are NOT cumulative; `wcag22aa` alone only matches 2.2-new rules. Assert 0 violations at serious/critical.
-  - [ ] Keep `color-contrast` ENABLED here (this is the only gate where it can truly run). `contrast:check` remains the primary token-math contrast gate; the jsdom axe gate (`App.axe.test.tsx`) keeps it disabled.
-- [ ] Task 4: WCAG 2.2 AA traceability matrix (AC 2)
-  - [ ] New doc `docs/wcag-conformance-matrix.md` (sibling of `docs/screen-reader-smoke-test.md`): one row per enumerated SC (1.4.3, 1.4.4, 1.4.10, 1.4.11, 1.4.12, 2.1.1, 2.1.2, 2.4.3, 2.4.7, 2.5.5, 2.5.8, 3.3.1, 3.3.4, 4.1.2, 4.1.3) → gating mechanism (exact gate/script/spec path + test name) → status (enforced / manual release gate).
-  - [ ] Playwright-scripted rows: verify each SC against the ACTUAL merged tests in `e2e/tests/ui/a11y-modes.spec.ts` (+ `keyboard-navigation.spec.ts` for focus-order surfaces) and cite the covering test by name. Known suspect: **1.4.12 Text Spacing has no covering e2e test** — the UX mechanism is "no fixed line-height/letter-spacing in component CSS; user-overridable". Either add a small assertion (e.g. inject the WCAG text-spacing overrides and assert no clipping/overlap/horizontal scroll) or map it explicitly to a named CSS-audit/stylelint mechanism — do NOT leave the row vague. Any other SC without a real covering test gets the same treatment: cover it or flag it to Keith. This is the "no silent gap" AC doing its job.
-  - [ ] Five manual rows: cite the scripted NVDA/VoiceOver smoke (`docs/screen-reader-smoke-test.md`), status "release-candidate gate". The doc must state explicitly that the axe subset alone does NOT constitute "AA enforced".
-  - [ ] Record in the matrix doc the declined option (Keith, 2026-07-14): **no dedicated whole-suite emulation Playwright projects** — 3.3's per-test emulation gates already satisfy the ACs; re-running the whole UI suite under emulation would multiply chromium CI time with no new assertion coverage. (This closes the pointer comment 3.3 left in `playwright.config.ts`.)
-- [ ] Task 5: @p0/@p1 selective execution + coverage thresholds (AC 6; deferred Epic 1 item 7 / epic-2 retro item 2)
-  - [ ] Verify `test:e2e:p0` / `test:e2e:p1` grep filters work against the expanded suite (scripts exist at root `package.json`). Note: all 7 `a11y-modes.spec.ts` gates are `@p1` — the CI job must run the full `test:e2e` (Task 1), not a `@p0`-filtered subset, or the WCAG gates silently drop out of the merge-blocking path.
-  - [ ] Add Vitest coverage thresholds for the P0 delete path: >90% unit / >80% integration (epic-1 retro item 7 targets) — scope thresholds to the delete-path modules rather than blanket global numbers if that's what the targets mean in context; record the chosen interpretation in the Dev Agent Record.
-- [ ] Task 6: bundle ratchet → absolute ceiling (AC 5)
-  - [ ] Rework `apps/web/scripts/check-bundle-size.mjs` + `apps/web/bundle-size-baseline.json` from always-trips ratchet to fail-only-if-over-budget absolute ceiling (deferred-work.md item; epic-2 retro item 7: the ratchet "is doing paperwork, not gate-keeping").
-  - [ ] Derive and document the ceiling value — see Dev Notes § TTI budget risk. If the slow-3G math contradicts the ≤1s budget, surface it to Keith; do not silently pick a number that hides the conflict.
-- [ ] Task 7: k6 dual-track (AC 3, 4, 6)
-  - [ ] Committed k6 script (suggested: `e2e/load/post-todos-signoff.js` — outside `e2e/tests/`, so Playwright's testDir won't pick it up) with explicit reproducible profile: concurrency (VUs), duration, ~100-todo seeded dataset, warm-vs-cold distinction, thresholds `http_req_duration: ['p(50)<100', 'p(95)<800']` scoped to the POST path (tag requests, e.g. `{type:'create'}`).
-  - [ ] Formal sign-off: run the script against the local Docker container (`open -a Docker` first on this machine; image build verified end-to-end in Story 1.11) and record environment + results in `docs/k6-latency-signoff.md`, patterned on `docs/screen-reader-smoke-test.md`.
-  - [ ] CI smoke job: docker build + `docker run`, curl wait-loop on `GET /health`, `grafana/setup-k6-action@v1` (NOT `grafana/k6-action` — archived), `k6 run` with **loosened thresholds** (suggest ~5× the formal numbers, e.g. `p(50)<500` / `p(95)<2000`; record the chosen values + rationale). Threshold breach exits code 99 → step fails → merge blocked. Note this makes CI exercise the Dockerfile for the first time.
-- [ ] Task 8: TTI slow-3G sign-off evidence (AC 5)
-  - [ ] One documented measurement: Playwright CDP `Network.emulateNetworkConditions` (~400ms latency, ~400Kbps down ≈ 50KB/s, matching the DevTools Slow-3G preset) against the **built** app (`npm run build` + prod-style serve), record time-to-usable-list in the sign-off doc (can share `docs/k6-latency-signoff.md` or its own section). This is evidence, not a per-PR gate.
-- [ ] Task 9: docs + bookkeeping (all ACs)
-  - [ ] Update `_bmad-output/implementation-artifacts/deferred-work.md`: mark the harness/CI item, tagging+thresholds item, and bundle-ratchet item resolved with pointers.
-  - [ ] Update `CLAUDE.md` commands section if new scripts are added (k6, coverage).
-  - [ ] Run the FULL gate suite locally (Node 24: `nvm use 24`) and the e2e suite **twice consecutively**; record gate evidence in the Dev Agent Record and commit body per repo convention.
+- [x] Task 1: CI `e2e` job (AC 1, 6)
+  - [x] Add a second job (e.g. `e2e`) to `.github/workflows/ci.yml`, parallel to `verify`: checkout, setup-node Node 24 + npm cache, `npm ci`, `npx playwright install --with-deps chromium`, `npm run test:e2e`. Shape is pre-specified in `e2e/README.md:97-102`. Do NOT cache Playwright browsers (Playwright docs: restore ≈ download time, OS deps uncacheable).
+  - [x] Failure-artifact upload of `test-results/` + `playwright-report/` via `actions/upload-artifact` with `if: ${{ !cancelled() }}` and a retention period.
+  - [x] The job runs the full suite (`npm run test:e2e`, no `--grep`/`--project` filter): both projects (api + chromium), which includes 3.3's merged `a11y-modes.spec.ts` gates — wiring this job is what makes those WCAG gates merge-blocking.
+  - [x] Update the stale header comment at `.github/workflows/ci.yml:8-13` ("Playwright … gates remain deferred to Epic 3" — 3.3 deliberately left it for this story) and the `e2e/README.md:97-102` "Story 3.4 will add…" paragraph to describe reality.
+- [x] Task 2: committed @p0 delete-path e2e specs (AC 6; closes deferred Epic 1 item 6 + deferred 1.7 AC 10)
+  - [x] New spec file under `e2e/tests/ui/` covering: arm→confirm→revert delete; 5s auto-revert (real Playwright timers — do NOT fake the timer under test); concurrent arm/submit. Use `waitForResponse`/`interceptNetworkCall` for determinism, tag `@p0`.
+  - [x] Follow the shared-parallel-DB conventions (Dev Notes § E2E landmines): `page.route` GET-scoping filter + random token (never `Date.now()`).
+- [x] Task 3: real-browser axe gate via `@axe-core/playwright` (AC 1, 2 — NFR3-E2E-002)
+  - [x] Add root devDep `@axe-core/playwright@^4.12.1` (matches the repo's existing `axe-core` 4.12.1; peer-compatible with `@playwright/test` 1.61.x).
+  - [x] New e2e spec (chromium project) scanning the rendered app states with the **full cumulative tag array** `['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']` — axe tags are NOT cumulative; `wcag22aa` alone only matches 2.2-new rules. Assert 0 violations at serious/critical.
+  - [x] Keep `color-contrast` ENABLED here (this is the only gate where it can truly run). `contrast:check` remains the primary token-math contrast gate; the jsdom axe gate (`App.axe.test.tsx`) keeps it disabled.
+- [x] Task 4: WCAG 2.2 AA traceability matrix (AC 2)
+  - [x] New doc `docs/wcag-conformance-matrix.md` (sibling of `docs/screen-reader-smoke-test.md`): one row per enumerated SC (1.4.3, 1.4.4, 1.4.10, 1.4.11, 1.4.12, 2.1.1, 2.1.2, 2.4.3, 2.4.7, 2.5.5, 2.5.8, 3.3.1, 3.3.4, 4.1.2, 4.1.3) → gating mechanism (exact gate/script/spec path + test name) → status (enforced / manual release gate).
+  - [x] Playwright-scripted rows: verify each SC against the ACTUAL merged tests in `e2e/tests/ui/a11y-modes.spec.ts` (+ `keyboard-navigation.spec.ts` for focus-order surfaces) and cite the covering test by name. Known suspect: **1.4.12 Text Spacing has no covering e2e test** — the UX mechanism is "no fixed line-height/letter-spacing in component CSS; user-overridable". Either add a small assertion (e.g. inject the WCAG text-spacing overrides and assert no clipping/overlap/horizontal scroll) or map it explicitly to a named CSS-audit/stylelint mechanism — do NOT leave the row vague. Any other SC without a real covering test gets the same treatment: cover it or flag it to Keith. This is the "no silent gap" AC doing its job. *(Resolved: added the text-spacing gate test to `a11y-modes.spec.ts`; also covered the 1.4.11 `--color-focus` gap with an 8th `check-contrast.mjs` pair; 1.4.11/4.1.3 "axe-core/automated" bucket corrections flagged in the matrix honesty notes.)*
+  - [x] Five manual rows: cite the scripted NVDA/VoiceOver smoke (`docs/screen-reader-smoke-test.md`), status "release-candidate gate". The doc must state explicitly that the axe subset alone does NOT constitute "AA enforced".
+  - [x] Record in the matrix doc the declined option (Keith, 2026-07-14): **no dedicated whole-suite emulation Playwright projects** — 3.3's per-test emulation gates already satisfy the ACs; re-running the whole UI suite under emulation would multiply chromium CI time with no new assertion coverage. (This closes the pointer comment 3.3 left in `playwright.config.ts`.)
+- [x] Task 5: @p0/@p1 selective execution + coverage thresholds (AC 6; deferred Epic 1 item 7 / epic-2 retro item 2)
+  - [x] Verify `test:e2e:p0` / `test:e2e:p1` grep filters work against the expanded suite (scripts exist at root `package.json`). Note: all 7 `a11y-modes.spec.ts` gates are `@p1` — the CI job must run the full `test:e2e` (Task 1), not a `@p0`-filtered subset, or the WCAG gates silently drop out of the merge-blocking path. *(Verified: `@p0` selects 6 tests incl. the 3 new delete-path specs; `@p0|@p1` selects all 23 — every test carries a priority tag.)*
+  - [x] Add Vitest coverage thresholds for the P0 delete path: >90% unit / >80% integration (epic-1 retro item 7 targets) — scope thresholds to the delete-path modules rather than blanket global numbers if that's what the targets mean in context; record the chosen interpretation in the Dev Agent Record.
+- [x] Task 6: bundle ratchet → absolute ceiling (AC 5)
+  - [x] Rework `apps/web/scripts/check-bundle-size.mjs` + `apps/web/bundle-size-baseline.json` from always-trips ratchet to fail-only-if-over-budget absolute ceiling (deferred-work.md item; epic-2 retro item 7: the ratchet "is doing paperwork, not gate-keeping"). *(Ceiling 95,000 B gz; no `--update` shortcut by design — raising it is a hand edit with PR rationale. Red-tested: gate exits 1 when over ceiling.)*
+  - [x] Derive and document the ceiling value — see Dev Notes § TTI budget risk. If the slow-3G math contradicts the ≤1s budget, surface it to Keith; do not silently pick a number that hides the conflict. *(Documented in the baseline JSON rationale + sign-off doc: the ceiling is an NFR-2 regression stop, deliberately NOT derived from the slow-3G math, which the current bundle cannot satisfy — discrepancy surfaced, see Task 8.)*
+- [x] Task 7: k6 dual-track (AC 3, 4, 6)
+  - [x] Committed k6 script (suggested: `e2e/load/post-todos-signoff.js` — outside `e2e/tests/`, so Playwright's testDir won't pick it up) with explicit reproducible profile: concurrency (VUs), duration, ~100-todo seeded dataset, warm-vs-cold distinction, thresholds `http_req_duration: ['p(50)<100', 'p(95)<800']` scoped to the POST path (tag requests, e.g. `{type:'create'}`).
+  - [x] Formal sign-off: run the script against the local Docker container (`open -a Docker` first on this machine; image build verified end-to-end in Story 1.11) and record environment + results in `docs/k6-latency-signoff.md`, patterned on `docs/screen-reader-smoke-test.md`. *(PASS: p50 2.85 ms / p95 6.34 ms, 601/601 creates 201.)*
+  - [x] CI smoke job: docker build + `docker run`, curl wait-loop on `GET /health`, `grafana/setup-k6-action@v1` (NOT `grafana/k6-action` — archived), `k6 run` with **loosened thresholds** (suggest ~5× the formal numbers, e.g. `p(50)<500` / `p(95)<2000`; record the chosen values + rationale). Threshold breach exits code 99 → step fails → merge blocked. Note this makes CI exercise the Dockerfile for the first time. *(Chose exactly p50<500/p95<2000; rationale recorded in ci.yml comment + sign-off doc.)*
+- [x] Task 8: TTI slow-3G sign-off evidence (AC 5)
+  - [x] One documented measurement: Playwright CDP `Network.emulateNetworkConditions` (~400ms latency, ~400Kbps down ≈ 50KB/s, matching the DevTools Slow-3G preset) against the **built** app (`npm run build` + prod-style serve), record time-to-usable-list in the sign-off doc (can share `docs/k6-latency-signoff.md` or its own section). This is evidence, not a per-PR gate. *(Median 7,839 ms — budget NOT met; root cause found: the container serves assets uncompressed (301 KB JS on the wire). Surfaced to Keith in the sign-off doc with options; script committed as `e2e/load/measure-tti.mjs`.)*
+- [x] Task 9: docs + bookkeeping (all ACs)
+  - [x] Update `_bmad-output/implementation-artifacts/deferred-work.md`: mark the harness/CI item, tagging+thresholds item, and bundle-ratchet item resolved with pointers. *(Also added one new deferred item: container response compression, found by the TTI run.)*
+  - [x] Update `CLAUDE.md` commands section if new scripts are added (k6, coverage).
+  - [x] Run the FULL gate suite locally (Node 24: `nvm use 24`) and the e2e suite **twice consecutively**; record gate evidence in the Dev Agent Record and commit body per repo convention.
 
 ## Dev Notes
 
@@ -136,11 +140,50 @@ Current bundle is ~92.5 KB gz (92,498 B after 3.3). Slow-3G ≈ 400 Kbps ≈ 50 
 
 ### Agent Model Used
 
+Claude Fable 5 (claude-fable-5) via Claude Code, 2026-07-14.
+
 ### Debug Log References
+
+- **Route-precedence leak (delete-path spec, first run):** `interceptNetworkCall({url: '/todos'})` registers a `page.route` AFTER the GET-scoping route; Playwright matches routes newest-first and its `route.continue()` bypassed the scoping filter entirely, leaking another worker's rows into the list count. Fix: register the POST-delay route BEFORE `scopeListTo` (my GET route `fallback()`s non-GETs down the chain) and sync on the slow POST via `waitForResponse`. Recorded as a comment in the spec for the next author.
+- **Mid-transition axe reading (armed-delete scan, first run):** axe measured fg `#a7605d` on `#f5f4ef` = 4.26:1 — a blend captured mid `--motion-settle` color transition (`.armed` is 6.6:1 at rest on both surfaces). Fix: poll until the confirm button's computed color equals the resolved `--color-error` before scanning.
+- **Coverage gate red on first run (correct behavior):** delete-path branches 84.6% < 90%. Closed by adding real tests, not lowering numbers: tap-away `[data-armed-delete]` guard branches (useArmedDelete) + the unknown-id/no-description defensive fallback (useDeleteTodo). Final: 97.59% stmts / 92.3% branch / 100% funcs / 100% lines.
+- **Docker Desktop slow start:** daemon took ~10 min to come up after `open -a Docker` (backend module fetches timing out against desktop.docker.com); patience, no config change needed.
 
 ### Completion Notes List
 
 - 2026-07-13 (create-story): Ultimate context engine analysis completed — comprehensive developer guide created. Scope decisions 1–3 locked with Keith (WCAG matrix in-flight 3.3 rows; k6 dual-track; bundle ceiling as TTI proxy).
 - 2026-07-14 (story review, post-3.3-merge): updated for merged reality — 3.3's gates are per-test emulation in `a11y-modes.spec.ts` (no emulation projects; config stub deleted); matrix rows now cite merged tests; 1.4.12 Text Spacing flagged as a probable coverage gap Task 4 must resolve; whole-suite emulation projects declined by Keith; current-state numbers refreshed (13 e2e tests, web 243, bundle 92,498 B); worktree-sync + sprint-status conflict guidance added.
+- 2026-07-14 (dev-story): all 9 tasks complete. **CI** now has three parallel merge-blocking jobs: `verify` (+ delete-path coverage thresholds), `e2e` (full unfiltered Playwright suite + failure artifacts), `k6-smoke` (production container + loosened thresholds p50<500/p95<2000 — first CI exercise of the Dockerfile). **New specs:** `delete-path.spec.ts` (3× @p0 — closes Epic 1 item 6 + 1.7 AC 10), `axe-gate.spec.ts` (6× @p1 real-browser WCAG 2.2 AA scans, color-contrast enabled, full cumulative tag array), text-spacing gate appended to `a11y-modes.spec.ts` (closes the 1.4.12 gap). **Matrix:** `docs/wcag-conformance-matrix.md` maps all 15 SCs with honesty notes — 1.4.11 and 4.1.3 were mis-bucketed as "axe-core/automated" in the epic (axe-core OSS automates neither); 1.4.11 is now locked by a new 8th `check-contrast.mjs` pair (`--color-focus` ≥3:1), 4.1.3 by the SR-contract spec. **Coverage interpretation (Task 5):** thresholds scoped to delete-path modules — web unit >90% on `useArmedDelete.ts`+`useDeleteTodo.ts`, API integration >80% on `todos.route.ts`+`todo.repository.ts` — a blanket global number would dilute the P0 signal. **Bundle gate:** absolute ceiling 95,000 B gz, no `--update` shortcut. **k6 formal sign-off: PASS** (p50 2.85 ms / p95 6.34 ms vs 100/800 budgets, 601/601 creates, environment recorded in `docs/k6-latency-signoff.md`). **TTI evidence: budget NOT met** — median 7,839 ms vs ≤1 s slow-3G; root cause: the container serves assets uncompressed (301 KB JS on the wire; even gzipped, the math can't reach 1 s at 50 KB/s). Surfaced to Keith in the sign-off doc with options (compression in 3.5 / revised budget / bundle diet); compression added to deferred-work.md.
+- **Gate evidence (2026-07-14, Node 24.16.0):** typecheck ✓; lint:css ✓; lint:css:selftest 14/14 ✓; web tests 246/246 with coverage 97.59/92.3/100/100 ≥ 90 ✓; contrast 8/8 pairs ✓; build ✓; size 92,498 ≤ 95,000 B gz ✓; API unit 18/18 ✓; API integration 31/31 with coverage 100/87.5/100/100 ≥ 80 ✓; e2e **23/23 twice consecutively** ✓ (10.9 s / 10.2 s); k6 formal run PASS (see sign-off doc). Ceiling gate red-tested (exits 1 when over). `@p0` grep selects 6 tests, `@p0|@p1` all 23.
 
 ### File List
+
+- `.github/workflows/ci.yml` (MODIFIED) — header rewrite; `e2e` job (full suite + artifact upload); `k6-smoke` job (docker build/run + health wait + setup-k6-action + loosened thresholds); verify steps switched to coverage variants.
+- `e2e/tests/ui/delete-path.spec.ts` (NEW) — 3× @p0 delete-path regression net.
+- `e2e/tests/ui/axe-gate.spec.ts` (NEW) — 6× @p1 real-browser axe WCAG 2.2 AA gate.
+- `e2e/tests/ui/a11y-modes.spec.ts` (MODIFIED) — appended text-spacing gate describe (WCAG 1.4.12, @p1).
+- `e2e/load/post-todos-signoff.js` (NEW) — k6 dual-track script (reproducible profile; env-overridable thresholds).
+- `e2e/load/measure-tti.mjs` (NEW) — CDP slow-3G TTI evidence script.
+- `e2e/README.md` (MODIFIED) — CI integration section describes the wired job.
+- `playwright.config.ts` (MODIFIED) — emulation-projects pointer comment closed with the recorded declined decision.
+- `docs/wcag-conformance-matrix.md` (NEW) — the AC 2 traceability matrix.
+- `docs/k6-latency-signoff.md` (NEW) — k6 formal sign-off (PASS) + TTI evidence (budget miss, decision needed).
+- `apps/web/scripts/check-contrast.mjs` (MODIFIED) — 8th pair: `--color-focus` on surface ≥3:1 (WCAG 1.4.11).
+- `apps/web/scripts/check-bundle-size.mjs` (MODIFIED) — ratchet → absolute ceiling; `--update` removed.
+- `apps/web/bundle-size-baseline.json` (MODIFIED) — `ceilingGzipBytes: 95000` + rationale.
+- `apps/web/vite.config.ts` (MODIFIED) — delete-path-scoped coverage thresholds (90).
+- `apps/web/package.json` (MODIFIED) — `test:coverage` script; `@vitest/coverage-v8` devDep.
+- `apps/web/src/hooks/useArmedDelete.test.ts` (MODIFIED) — tap-away pointerdown branch tests.
+- `apps/web/src/hooks/useDeleteTodo.test.tsx` (MODIFIED) — unknown-id defensive-fallback test.
+- `apps/api/vitest.config.ts` (MODIFIED) — delete-path-scoped coverage thresholds (80).
+- `apps/api/package.json` (MODIFIED) — `test:integration:coverage` script; `@vitest/coverage-v8` devDep.
+- `package.json` + `package-lock.json` (MODIFIED) — `@axe-core/playwright@^4.12.1` root devDep.
+- `.gitignore` (MODIFIED) — `coverage/`.
+- `CLAUDE.md` (MODIFIED) — commands + CI description updated.
+- `_bmad-output/implementation-artifacts/deferred-work.md` (MODIFIED) — three items resolved; one new (container compression).
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (MODIFIED) — status transitions.
+- `_bmad-output/implementation-artifacts/3-4-expanded-ci-quality-gates-wcag-conformance.md` (MODIFIED) — this file.
+
+## Change Log
+
+- 2026-07-14 — Story 3.4 implemented (dev-story): CI e2e + k6-smoke jobs, @p0 delete-path specs, real-browser axe gate, WCAG 2.2 AA conformance matrix (1.4.12 + 1.4.11 gaps closed), delete-path coverage thresholds, bundle ceiling conversion, k6 dual-track with formal sign-off (PASS), TTI slow-3G evidence (budget miss surfaced). Full gate suite green; e2e 23/23 ×2. Status → review.

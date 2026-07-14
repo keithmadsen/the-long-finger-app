@@ -480,3 +480,80 @@ test.describe('prefers-contrast gate (Story 3.3, AC 4)', () => {
     await expect(descriptionEl(page, doneName)).toHaveCSS('color', activeColor)
   })
 })
+
+test.describe('text-spacing gate (Story 3.4, WCAG 1.4.12)', () => {
+  test('@p1 WCAG text-spacing overrides: no horizontal scroll, no clipped controls, everything operable', async ({
+    page,
+    seedTodos,
+  }) => {
+    const stamp = randomToken()
+    const shortName = `spacing short ${stamp}`
+    // Worst case for overflow: the contract-max 200-char description with an
+    // unbroken tail (zoom-gate precedent) — wider letter/word spacing makes
+    // this the row most likely to clip or force horizontal scroll.
+    const longName = `spacing long ${stamp} ${'x'.repeat(200)}`.slice(0, 200)
+    await seedTodos([{ description: shortName }, { description: longName }])
+
+    await scopeListTo(page, stamp)
+    await page.goto('/')
+    await expect(page.getByRole('listitem')).toHaveCount(2)
+
+    // Inject the WCAG 1.4.12 user overrides verbatim: users may set these "with
+    // no other change" and lose no content or functionality. The UX mechanism
+    // is "no fixed line-height/letter-spacing in component CSS" — this is the
+    // executable lock on that claim.
+    await page.addStyleTag({
+      content: `* {
+        line-height: 1.5em !important;
+        letter-spacing: 0.12em !important;
+        word-spacing: 0.16em !important;
+      }
+      p { margin-bottom: 2em !important; }`,
+    })
+
+    // Guard against a vacuous pass: the override must actually be in effect on
+    // the row text (0.12em of the description's own font size).
+    const spacing = await descriptionEl(page, longName).evaluate((el) => {
+      const s = getComputedStyle(el)
+      return {
+        letterSpacing: parseFloat(s.letterSpacing),
+        fontSize: parseFloat(s.fontSize),
+      }
+    })
+    expect(spacing.letterSpacing).toBeCloseTo(spacing.fontSize * 0.12, 1)
+
+    // No loss of content or functionality (the 1.4.12 pass condition):
+    // nothing forces horizontal scroll, both rows and every control stay
+    // visible, and the core interactions still operate.
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
+      ),
+    ).toBe(true)
+
+    const input = page.getByPlaceholder(CAPTURE_PLACEHOLDER)
+    await expect(input).toBeVisible()
+    await input.fill(`spacing capture ${stamp}`)
+    await expect(input).toHaveValue(`spacing capture ${stamp}`)
+
+    await row(page, shortName).locator('label').click()
+    await expect(page.getByRole('checkbox', { name: shortName })).toBeChecked()
+
+    const deleteButton = page.getByRole('button', {
+      name: `Delete '${longName}'`,
+    })
+    await expect(deleteButton).toBeVisible()
+    await deleteButton.click()
+    await expect(row(page, longName).getByRole('button')).toHaveText('Confirm')
+
+    // Controls are not clipped by their containers: each remains at a usable
+    // height under the inflated line-height (no overflow-hidden crushing).
+    for (const locator of [input, deleteButton]) {
+      const box = await locator.boundingBox()
+      expect(box).not.toBeNull()
+      expect(box!.height).toBeGreaterThanOrEqual(24)
+    }
+  })
+})

@@ -178,6 +178,29 @@ describe('useDeleteTodo announcements (Story 2.3)', () => {
     expect(announce).toHaveBeenCalledWith('Rendered row deleted.')
   })
 
+  it('unknown id with NO rendered description and NO cache fires no DELETE and reconciles via invalidate (Story 3.4 coverage gate)', async () => {
+    const client = createTestQueryClient()
+    const announce = vi.fn()
+    // The cache was never populated (getQueryData → undefined) and the caller
+    // passes no rendered description: there is nothing to announce and no safe
+    // target — the defensive fallback refetches instead of firing a mutation.
+    const fetchMock = stubFetch({ getList: () => [] })
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries')
+
+    const { result } = setup(client, announce)
+    act(() => result.current.deleteTodo('ghost'))
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['todos'] }),
+    )
+    const deleteCalls = fetchMock.mock.calls.filter(
+      ([, init]) => init?.method === 'DELETE',
+    )
+    expect(deleteCalls).toHaveLength(0)
+    expect(announce).not.toHaveBeenCalled()
+    expect(result.current.deletingIds.size).toBe(0)
+  })
+
   it('announces the shared mutation-failure copy once on error and does NOT write the cache in onError (AC 5)', async () => {
     const client = createTestQueryClient()
     const announce = vi.fn()

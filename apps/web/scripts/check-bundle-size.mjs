@@ -1,31 +1,33 @@
 /*
- * Ratcheting bundle-size gate (Story 1.6, AC 9).
+ * Absolute-ceiling bundle-size gate (Story 3.4, AC 5 — converted from the
+ * Story 1.6 ratchet per epics Notes #14 / epic-2 retro item 7: the ratchet
+ * "is doing paperwork, not gate-keeping").
  *
  * After a production build, measures the gzipped size of the dist JS + CSS
- * assets and compares the total against a committed baseline. Fails the build
- * if the total grows beyond a small tolerance — a ratchet that catches size
- * growth vs. the last committed baseline, NOT an absolute ceiling yet. The
- * absolute ceiling freezes once Epic 1's UI is complete (epics Notes #14).
+ * assets and fails the build only if the total exceeds the committed ceiling
+ * in bundle-size-baseline.json. The ceiling is the merge-blocking proxy for
+ * the NFR-2 TTI budget (Lighthouse dropped TTI in v10; live timing on shared
+ * runners is flaky — see docs/k6-latency-signoff.md for the recorded slow-3G
+ * measurement and the budget discrepancy it documents).
+ *
+ * There is deliberately NO --update flag: an auto-rebaseline path is what made
+ * the ratchet paperwork. Raising the ceiling is a hand edit to
+ * bundle-size-baseline.json that must carry its rationale in the PR.
  *
  * Run after a build:  `npm run build --workspace apps/web`
  *                     `npm run size:check --workspace apps/web`
- * Update the baseline INTENTIONALLY (e.g. after a deliberate dependency add):
- *                     `npm run size:check --workspace apps/web -- --update`
  *
  * Standalone node gate, mirroring scripts/verify-token-lint.mjs — no size-limit
  * dependency, consistent with the repo's zero-extra-tooling lint scripts.
  */
 
 import { gzipSync } from 'node:zlib'
-import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const DIST_DIR = new URL('../dist', import.meta.url).pathname
-const BASELINE_FILE = new URL('../bundle-size-baseline.json', import.meta.url)
+const CEILING_FILE = new URL('../bundle-size-baseline.json', import.meta.url)
   .pathname
-// Allow small, non-meaningful drift (hashing, minifier nondeterminism) before
-// the gate trips; a real growth blows past this.
-const TOLERANCE_BYTES = 512
 
 /** Recursively collect .js/.css asset paths under dist. */
 function collectAssets(dir) {
@@ -65,40 +67,34 @@ function measureGzipBytes() {
   return { total, count: assets.length }
 }
 
-const isUpdate = process.argv.includes('--update')
 const { total, count } = measureGzipBytes()
 console.log(`  ${'—'.repeat(7)}`)
 console.log(`  ${total.toString().padStart(7)} B gz  total across ${count} asset(s)\n`)
 
-if (isUpdate) {
-  writeFileSync(
-    BASELINE_FILE,
-    `${JSON.stringify({ totalGzipBytes: total }, null, 2)}\n`,
-  )
-  console.log(`Baseline updated → ${total} B gz (bundle-size-baseline.json).`)
-  process.exit(0)
-}
-
-let baseline
+let ceiling
 try {
-  baseline = JSON.parse(readFileSync(BASELINE_FILE, 'utf8'))
+  const parsed = JSON.parse(readFileSync(CEILING_FILE, 'utf8'))
+  ceiling = parsed.ceilingGzipBytes
 } catch {
+  ceiling = undefined
+}
+if (typeof ceiling !== 'number' || !Number.isFinite(ceiling)) {
   console.error(
-    'No bundle-size-baseline.json. Create it with `npm run size:check --workspace apps/web -- --update`.',
+    'No valid `ceilingGzipBytes` in bundle-size-baseline.json — the absolute ceiling must be a committed number (see the file for its rationale).',
   )
   process.exit(1)
 }
 
-const budget = baseline.totalGzipBytes + TOLERANCE_BYTES
-if (total <= budget) {
+if (total <= ceiling) {
   console.log(
-    `Bundle-size gate: ${total} B gz ≤ ${baseline.totalGzipBytes} B baseline (+${TOLERANCE_BYTES} B tolerance). OK.`,
+    `Bundle-size gate: ${total} B gz ≤ ${ceiling} B gz absolute ceiling (${ceiling - total} B headroom). OK.`,
   )
   process.exit(0)
 }
 
 console.error(
-  `Bundle-size gate: ${total} B gz EXCEEDS ${baseline.totalGzipBytes} B baseline (+${TOLERANCE_BYTES} B tolerance) by ${total - budget} B.\n` +
-    'If this growth is intentional, rebaseline: `npm run size:check --workspace apps/web -- --update`.',
+  `Bundle-size gate: ${total} B gz EXCEEDS the ${ceiling} B gz absolute ceiling by ${total - ceiling} B.\n` +
+    'Shrink the bundle, or raise `ceilingGzipBytes` in bundle-size-baseline.json ' +
+    'as a deliberate, justified change in the PR (there is no --update shortcut by design).',
 )
 process.exit(1)

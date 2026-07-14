@@ -96,10 +96,14 @@ disposable and can be deleted between runs.
 
 ## CI integration
 
-Not yet wired into `.github/workflows/ci.yml` — that single `e2e` job (plus
-`npx playwright install --with-deps chromium` and failure-artifact upload of
-`test-results/` + `playwright-report/`) is **Story 3.4**. HTML + JUnit reporters
-are already configured; JUnit lands at `test-results/results.xml`.
+Wired into `.github/workflows/ci.yml` as the `e2e` job (Story 3.4), parallel to
+`verify`: Node 24 + `npm ci`, `npx playwright install --with-deps chromium`,
+then the **full unfiltered** `npm run test:e2e` — both projects, including the
+`@p1` WCAG gates in `a11y-modes.spec.ts` (a `@p0`-filtered run would silently
+drop them from the merge-blocking path). `test-results/` + `playwright-report/`
+are uploaded as artifacts via `actions/upload-artifact` when the run isn't
+cancelled. Browser binaries are not cached (Playwright docs recommend against
+it). JUnit lands at `test-results/results.xml`.
 
 ## Knowledge base references
 

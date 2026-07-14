@@ -132,6 +132,17 @@ const PAIRS = [
     target: 4.5,
     label: 'pending text on surface (AA)',
   },
+  {
+    // WCAG 1.4.11 Non-text Contrast (Story 3.4): the focus ring is declared as
+    // its own token precisely so it CAN diverge from --color-accent — so it
+    // must be gated in its own right, not assumed covered by the accent pair.
+    // axe-core has no automated 1.4.11 rule; this pair is the executable lock
+    // for the UX conformance claim "focus ring exceeds the 3:1 requirement".
+    fg: '--color-focus',
+    bg: '--color-surface',
+    target: 3,
+    label: 'focus ring on surface (non-text ≥3:1 — WCAG 1.4.11)',
+  },
 ]
 
 let failures = 0
