@@ -257,7 +257,8 @@ test.describe('responsive + 200%-zoom + reflow gates (Story 3.3, AC 1, 2, 6)', (
     const stamp = randomToken()
     const shortName = `zoom short ${stamp}`
     // Worst case for overflow: the contract-max 200-char description with a
-    // long unbroken tail (no wrap opportunities — the 2-line clamp must clip).
+    // long unbroken tail (no natural wrap opportunities — overflow-wrap must
+    // contain it without clipping or horizontal scroll).
     const longName = `zoom long ${stamp} ${'x'.repeat(200)}`.slice(0, 200)
     await seedTodos([{ description: shortName }, { description: longName }])
 
@@ -494,6 +495,7 @@ test.describe('text-spacing gate (Story 3.4, WCAG 1.4.12)', () => {
     const longName = `spacing long ${stamp} ${'x'.repeat(200)}`.slice(0, 200)
     await seedTodos([{ description: shortName }, { description: longName }])
 
+    await page.setViewportSize({ width: 320, height: 568 })
     await scopeListTo(page, stamp)
     await page.goto('/')
     await expect(page.getByRole('listitem')).toHaveCount(2)
@@ -522,6 +524,26 @@ test.describe('text-spacing gate (Story 3.4, WCAG 1.4.12)', () => {
     })
     expect(spacing.letterSpacing).toBeCloseTo(spacing.fontSize * 0.12, 1)
 
+    const fullDescription = descriptionEl(page, longName)
+    await expect(fullDescription).toHaveText(longName)
+    const descriptionBox = await fullDescription.evaluate((el) => {
+      const s = getComputedStyle(el)
+      return {
+        overflow: s.overflow,
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight,
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+      }
+    })
+    expect(descriptionBox.overflow).toBe('visible')
+    expect(descriptionBox.scrollHeight).toBeLessThanOrEqual(
+      descriptionBox.clientHeight,
+    )
+    expect(descriptionBox.scrollWidth).toBeLessThanOrEqual(
+      descriptionBox.clientWidth,
+    )
+
     // No loss of content or functionality (the 1.4.12 pass condition):
     // nothing forces horizontal scroll, both rows and every control stay
     // visible, and the core interactions still operate.
@@ -546,11 +568,14 @@ test.describe('text-spacing gate (Story 3.4, WCAG 1.4.12)', () => {
     })
     await expect(deleteButton).toBeVisible()
     await deleteButton.click()
-    await expect(row(page, longName).getByRole('button')).toHaveText('Confirm')
+    const confirmButton = row(page, longName).getByRole('button', {
+      name: /^Confirm deletion of /,
+    })
+    await expect(confirmButton).toHaveText('Confirm')
 
     // Controls are not clipped by their containers: each remains at a usable
     // height under the inflated line-height (no overflow-hidden crushing).
-    for (const locator of [input, deleteButton]) {
+    for (const locator of [input, confirmButton]) {
       const box = await locator.boundingBox()
       expect(box).not.toBeNull()
       expect(box!.height).toBeGreaterThanOrEqual(24)

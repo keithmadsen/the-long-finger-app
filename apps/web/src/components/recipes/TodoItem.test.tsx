@@ -8,7 +8,7 @@ import { FLICKER_THRESHOLD_MS } from '../../hooks/usePendingPresentation'
 
 // NOTE: CSS-Module class names are scoped/hashed (e.g. `_complete_ab12`), so we
 // assert on the local name as a substring of className — proving the modifier /
-// clamp class is applied without computing layout (jsdom cannot lay out).
+// state class is applied without computing layout (jsdom cannot lay out).
 function classNameOf(element: Element | null): string {
   return element?.className ?? ''
 }
@@ -605,14 +605,11 @@ describe('TodoItem', () => {
     })
   })
 
-  it('applies the 2-line line-clamp markup to a long description (AC 4)', () => {
+  it('renders the complete long description for responsive text wrapping', () => {
     const longText =
       'This is a deliberately very long task description that would wrap well past two lines if it were not clamped at the boundary'
     render(<TodoItem todo={makeTodo({ description: longText })} />)
 
-    // The clamp lives on the `description` class; asserting its presence proves
-    // the truncation markup is applied (jsdom cannot lay out, so we do not
-    // assert rendered pixel height — story Task 7).
-    expect(classNameOf(screen.getByText(longText))).toMatch(/description/)
+    expect(screen.getByText(longText)).toHaveTextContent(longText)
   })
 })

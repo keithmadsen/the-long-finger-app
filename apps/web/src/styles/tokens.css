@@ -33,7 +33,7 @@
   --color-pending: #6e6d67;
 
   /* ---- Accents, borders, focus, error --------------------------------- */
-  --color-border: #dddcd5; /* Form-control borders (TextInput, Checkbox). */
+  --color-border: #888781; /* Control boundary; ≥3:1 on surface/muted surface. */
   --color-divider: #e4e2dc; /* Between-row rules; pencil-guide weight. */
   --color-accent: #3d5a80; /* Affordance (links, retry); muted slate blue. */
   --color-focus: #3d5a80; /* Focus ring; declared separately to allow divergence. */

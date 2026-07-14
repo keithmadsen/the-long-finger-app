@@ -128,7 +128,7 @@ Full detail in the Architecture doc. QA-relevant summary:
 | NFR Category | Requirement / Threshold | Planned Validation | Tool / Level | Evidence Artifact | Priority |
 |---|---|---|---|---|---|
 | Security | Reject malformed/oversized inputs (400); escape `description`; params-only SQL | Validation + injection/XSS tests | API + E2E + `npm audit` | Test results + audit report | P2 |
-| Performance | p50≤100 ms / p95≤800 ms; TTI≤1 s @≤100 items (3G) | API latency + TTI + bundle | k6 (manual full) / Lighthouse + `size-limit` (CI smoke) | k6 summary, Lighthouse, size report | P2 |
+| Performance | p50≤100 ms / p95≤800 ms; time-to-usable≤10 s @≤100 items (slow 3G) | API latency + time-to-usable + bundle | k6 (manual full) / Playwright CDP evidence + bundle ceiling | k6 summary, browser timing, size report | P2 |
 | Reliability | Zero data loss; durable across restart | Failure-preservation + restart tests | Integration + `/health` | Integration results | P0/P1 |
 | Maintainability | Risk-tiered coverage; layer separation | Per-layer unit + coverage report | Vitest + CI | Coverage JSON, lint/arch checks | P1 |
 | Accessibility | WCAG 2.2 AA; keyboard + SR; not color alone | axe scan + keyboard nav + contrast | Playwright + axe-core | axe report, contrast-gate artifact | P1/P2 |
@@ -225,7 +225,7 @@ Full detail in the Architecture doc. QA-relevant summary:
 | **NFR3-E2E-003** | contrast-regression gate | E2E | R-014 | committed in UX |
 | **NFR4-E2E-001** | responsive 320 px & desktop — no overlap/clipping | E2E | NFR-4 | — |
 | **NFR1-PERF-002** | API latency smoke assertion (small run) | k6/API | R-003 | CI smoke |
-| **NFR2-PERF-001** | Lighthouse TTI ≤1 s @100 items (3G) + `size-limit` gate | Lighthouse/CI | R-011 | CI smoke |
+| **NFR2-PERF-001** | Playwright time-to-usable ≤10 s @100 items (slow 3G) + absolute bundle ceiling | Playwright evidence/CI size gate | R-011 | Release evidence + CI proxy |
 | **NFR1-PERF-001** | k6 API latency under expected load → p50≤100 ms, p95≤800 ms | k6 | R-003 | manual full |
 
 **Total P2:** ~17 tests

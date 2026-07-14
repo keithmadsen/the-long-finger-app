@@ -49,7 +49,7 @@ detectedStack: 'fullstack'
 
 **Extracted for downstream steps:**
 - Tech stack & integration points: Fastify v5 API (4 REST endpoints + /health) → better-sqlite3 (single `todos` table); React+Vite SPA → TanStack Query → API; client-generated UUIDv7; TypeBox contract shared via `@tlf/contracts`.
-- NFR thresholds: NFR-1 ≤300 ms visible update after backend response (UX tightens: p50 submit ≤100 ms, p95 ≤800 ms); NFR-2 TTI <1 s for ≤100 items (UX: ≤1 s slow 3G); NFR-3 WCAG 2.2 AA; NFR-4 320 px–desktop; NFR-5 layer separation; NFR-6 no data loss/corruption.
+- NFR thresholds: NFR-1 ≤300 ms visible update after backend response (UX tightens: p50 submit ≤100 ms, p95 ≤800 ms); NFR-2 local load <1 s and UX time-to-usable ≤10 s for ≤100 items on slow 3G; NFR-3 WCAG 2.2 AA; NFR-4 320 px–desktop; NFR-5 layer separation; NFR-6 no data loss/corruption.
 - Missing-threshold questions: production telemetry/error-tracking thresholds open; bundle-size budget not yet a CI gate (flagged in architecture Gap Analysis).
 
 ## Step 3: Testability & Risk Assessment
@@ -81,7 +81,7 @@ detectedStack: 'fullstack'
 | ASR-4 | Optimistic UI with rollback (`onMutate`/`onError`/`onSettled`) | ACTIONABLE |
 | ASR-5 | Repository is sole DB-aware module; snake↔camel mapper (NFR-5) | ACTIONABLE |
 | ASR-6 | Latency budgets NFR-1 (p50≤100 ms / p95≤800 ms) | ACTIONABLE |
-| ASR-7 | TTI ≤1 s slow-3G / bundle budget (NFR-2) | ACTIONABLE |
+| ASR-7 | Time-to-usable ≤10 s slow-3G / bundle budget (NFR-2) | ACTIONABLE |
 | ASR-8 | Durable persistence across restart via mounted volume (FR-9) | ACTIONABLE |
 | ASR-9 | Input validation is the security boundary (no auth, NG-1/2) | ACTIONABLE |
 | ASR-10 | WCAG 2.2 AA + contrast-regression gate (NFR-3) | ACTIONABLE |
@@ -96,7 +96,7 @@ Probability/Impact 1–3; Score = P×I. Action per probability-impact thresholds
 | **R-001** | DATA | Data loss/corruption on a failed create/complete/delete (NFR-6, FR-9) | 2 | 3 | **6** | MITIGATE (P1) | Atomic single-row writes + WAL; integration tests asserting state preserved on failure; reliability tests (Dev+QA) |
 | **R-009** | OPS | SQLite volume not mounted / wrong `DATABASE_PATH` → data lost on restart | 2 | 3 | **6** | MITIGATE (P1) | Restart-persistence test; Docker/compose volume assertion; startup check logs DB path (Dev/Ops) |
 | R-002 | DATA | Optimistic rollback leaves client state inconsistent with server | 2 | 2 | 4 | MONITOR (P2) | E2E rollback test; `onSettled` invalidates `['todos']`; disable test retries (QA) |
-| R-003 | PERF | API p95>800 ms or TTI>1 s on 3G (NFR-1/2) | 2 | 2 | 4 | MONITOR (P2) | k6 API latency + Lighthouse TTI; see R-011 (QA) |
+| R-003 | PERF | API p95>800 ms or time-to-usable>10 s on slow 3G (NFR-1/2) | 2 | 2 | 4 | MONITOR (P2) | k6 API latency + Playwright CDP timing; see R-011 (QA) |
 | R-004 | DATA | Canonical ordering wrong (ties, write-once vs updated_at) | 2 | 2 | 4 | MONITOR (P2) | Repository ordering tests with seeded timestamps (TC-1) (Dev+QA) |
 | R-005 | BUS | DELETE idempotency contract violated (404 vs 204; double-delete) | 2 | 2 | 4 | MONITOR (P2) | Explicit idempotency contract test (QA) |
 | R-006 | BUS | Description validation bypass (empty/whitespace/>200, trim) | 2 | 2 | 4 | MONITOR (P2) | Client+server validation tests, boundary values 0/1/200/201 (QA) |
@@ -115,7 +115,7 @@ Probability/Impact 1–3; Score = P×I. Action per probability-impact thresholds
 | NFR Category | In scope? | Threshold | Planned evidence | Status |
 |---|---|---|---|---|
 | Security (SEC) | Yes (input-validation boundary; no auth) | All malformed/oversized inputs → 400; `description` rendered escaped; params-only SQL | API validation tests, XSS E2E, `npm audit` CI | Planned |
-| Performance (PERF) | Yes | NFR-1 p50≤100 ms/p95≤800 ms (submit); NFR-2 TTI≤1 s @≤100 items, slow 3G | k6 API latency, Lighthouse/Playwright TTI, `size-limit` gate | Planned — **threshold scope UNKNOWN (Q1)** |
+| Performance (PERF) | Yes | NFR-1 p50≤100 ms/p95≤800 ms (submit); NFR-2 time-to-usable≤10 s @≤100 items, slow 3G | k6 API latency, Playwright CDP timing, absolute bundle ceiling | Story 3.4 evidence recorded; CI proxy enforced |
 | Reliability (DATA/OPS) | Yes | Zero data loss/corruption (binary); durable across restart | Integration failure-preservation tests, restart-persistence test, `/health` | Planned |
 | Maintainability (TECH) | Yes | Layer separation enforced; **coverage % UNDEFINED** | Per-layer unit tests, coverage report, test-quality DoD | Planned — **threshold UNKNOWN (Q2)** → default CONCERNS |
 | Accessibility | Yes | WCAG 2.2 AA; keyboard + SR; not color alone | axe-core scan, keyboard-nav E2E, contrast-regression gate | Planned |
@@ -249,7 +249,7 @@ Test IDs: `{FR|area}-{LEVEL}-{SEQ}`. Levels chosen per `test-levels-framework`; 
 |---|---|---|---|---|
 | NFR1-PERF-001 | k6 API latency under expected load → p50≤100 ms, p95≤800 ms | k6 (manual full) | P2 | R-003 |
 | NFR1-PERF-002 | API latency smoke assertion on small run (CI) | k6/API (CI smoke) | P2 | R-003 |
-| NFR2-PERF-001 | Lighthouse TTI ≤1 s @100 items, throttled 3G + `size-limit` bundle gate (CI) | Lighthouse/CI (smoke) | P2 | R-011 |
+| NFR2-PERF-001 | Playwright time-to-usable ≤10 s @100 items, throttled 3G + absolute bundle ceiling | Playwright evidence/CI size gate | P2 | R-011 |
 
 ### 4.2 NFR Coverage & Evidence Plan
 - **Security** → SEC-API-001/E2E-001/CI-001 → evidence: integration+E2E pass, `npm audit` report.
@@ -276,5 +276,5 @@ Test IDs: `{FR|area}-{LEVEL}-{SEQ}`. Levels chosen per `test-levels-framework`; 
 - **R-001 and R-009 mitigations verified** (data-loss + restart-persistence tests green) before release — these are the only score-6 risks.
 - **Coverage (risk-tiered):** P0 unit >90% / int >80%; P1 unit >80% / int >60%; P2 smoke. Maintainability NFR clears CONCERNS once met.
 - **a11y:** axe zero critical violations + contrast gate green.
-- **Perf:** CI smoke within budget (p95≤800 ms smoke assertion, TTI≤1 s, bundle within `size-limit`); manual full k6 sign-off before release.
+- **Perf:** CI smoke within budget (p95≤800 ms tripwire, bundle within absolute ceiling); manual strict k6 and slow-3G Playwright evidence before release.
 - NFR evidence sources identified for every in-scope category; final NFR status deferred to `nfr-assess`.

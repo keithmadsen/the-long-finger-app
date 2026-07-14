@@ -58,6 +58,12 @@ function measureGzipBytes() {
   }
 
   const assets = collectAssets(DIST_DIR).sort()
+  if (assets.length === 0) {
+    console.error(
+      `No JavaScript or CSS assets found under ${DIST_DIR}; refusing to pass an empty or misconfigured build.`,
+    )
+    process.exit(1)
+  }
   let total = 0
   for (const file of assets) {
     const gz = gzipSync(readFileSync(file)).length

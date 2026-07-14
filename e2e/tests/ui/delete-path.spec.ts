@@ -148,12 +148,22 @@ test.describe('delete path (Story 3.4, @p0 regression net)', () => {
     const burst = [1, 2, 3].map((n) => `burst ${n} ${stamp}`)
     const slowCreate = `slow create ${stamp}`
 
-    // Hold ONLY the slow-create POST in flight for 1.2 s (real request, real
-    // server — delayed at the route layer). Registered BEFORE scopeListTo:
+    // Hold ONLY the slow-create POST behind an explicit gate until DELETE has
+    // completed. This proves the two mutations overlap even on a slow runner;
+    // a fixed delay could expire before the delete interaction reaches the
+    // server. Registered BEFORE scopeListTo:
     // Playwright matches routes newest-first, so the GET-scoping route must be
     // the newest or its filter is bypassed for every request it doesn't
     // fulfill itself (this exact leak failed the first run of this spec —
     // interceptNetworkCall on '/todos' out-precedenced the GET scope).
+    let markSlowCreateIntercepted: () => void = () => undefined
+    const slowCreateIntercepted = new Promise<void>((resolve) => {
+      markSlowCreateIntercepted = resolve
+    })
+    let releaseSlowCreate: () => void = () => undefined
+    const slowCreateGate = new Promise<void>((resolve) => {
+      releaseSlowCreate = resolve
+    })
     await page.route('**/todos', async (route) => {
       const request = route.request()
       const isSlowCreate =
@@ -161,7 +171,8 @@ test.describe('delete path (Story 3.4, @p0 regression net)', () => {
         (request.postDataJSON() as { description?: string })?.description ===
           slowCreate
       if (!isSlowCreate) return route.fallback()
-      await new Promise((resolve) => setTimeout(resolve, 1200))
+      markSlowCreateIntercepted()
+      await slowCreateGate
       await route.continue()
     })
     await scopeListTo(page, stamp)
@@ -199,6 +210,7 @@ test.describe('delete path (Story 3.4, @p0 regression net)', () => {
       await input.press('Enter')
       const pendingRow = page.getByRole('listitem').filter({ hasText: slowCreate })
       await expect(pendingRow).toHaveAttribute('aria-busy', 'true')
+      await slowCreateIntercepted
 
       const seededRowLocator = page
         .getByRole('listitem')
@@ -216,11 +228,14 @@ test.describe('delete path (Story 3.4, @p0 regression net)', () => {
 
       // The in-flight create settles untouched by the delete: the row confirms
       // (aria-busy dropped — React removes aria-busy={false} entirely).
+      releaseSlowCreate()
       await slowPostSettled
       await expect(pendingRow).toHaveCount(1)
       await expect(pendingRow).not.toHaveAttribute('aria-busy', 'true')
       await expect(page.getByRole('listitem')).toHaveCount(4)
     } finally {
+      // Never leave a routed request hanging if an assertion above fails.
+      releaseSlowCreate()
       // Self-cleaning: UI-created rows have unknown client-generated ids —
       // reconcile against the API and delete by description (3.2 precedent).
       const { body } = await apiRequest<Array<{ id: string; description: string }>>({
