@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-16
-last_updated: 2026-07-14  # 3-5 → review (dev-story complete)
+last_updated: 2026-07-14  # 3-5 → done (code-review patches applied)
 # 2026-07-01: 2-2 dev-story complete
 # 2026-07-01: 2-1 → in-progress (dev-story)
 # 2026-07-01: 2-1 → review (dev-story complete)
@@ -113,6 +113,7 @@ project: the long finger
 # 2026-07-14: 3-5 → ready-for-dev (create-story); created out of order — 3-4 remains backlog (parallel track, Keith's call). Scope: strict CSP at static layer (helmet directives + swagger-ui staticCSP), warn-level 4xx logging + never-log-payloads lock, SIGKILL/WAL crash-recovery integration test, scripted docker volume verification, graceful shutdown + exec-form CMD (default-in). No CI changes (3.4 owns CI)
 # 2026-07-14: 3-5 → in-progress (dev-story)
 # 2026-07-14: 3-5 → review (dev-story complete); container script run recorded (docker stop 0s graceful, SIGKILL restart intact); CSP browser pass clean; crash-test spawn corrected to single-process node --import tsx after tsx/cli wrapper form was caught passing vacuously
+# 2026-07-14: 3-5 → done (code-review patches applied); crash proof hardened, Docker resources isolated, bounded probes, full API + container verification green
 project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"
@@ -146,5 +147,5 @@ development_status:
   3-2-consolidated-screen-reader-contract: done
   3-3-responsive-forced-colors-reduced-motion-verification: done
   3-4-expanded-ci-quality-gates-wcag-conformance: backlog
-  3-5-hardened-production-deploy: review
+  3-5-hardened-production-deploy: done
   epic-3-retrospective: optional

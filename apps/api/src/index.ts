@@ -41,10 +41,13 @@ function shutdown(signal: NodeJS.Signals): void {
   shuttingDown = true;
   app.log.info({ signal }, 'received shutdown signal, closing');
   app.close().then(
-    () => process.exit(0),
+    () => {
+      // Let Node drain pino/stdout instead of truncating buffered lifecycle logs.
+      process.exitCode = 0;
+    },
     (err) => {
       app.log.error(err);
-      process.exit(1);
+      process.exitCode = 1;
     },
   );
 }

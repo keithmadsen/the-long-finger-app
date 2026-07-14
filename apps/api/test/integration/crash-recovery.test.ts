@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -30,17 +31,33 @@ const tsxLoaderUrl = pathToFileURL(createRequire(import.meta.url).resolve('tsx')
 // both via `npm run test:integration` (cwd apps/api) and `--root apps/api`.
 const serverEntry = fileURLToPath(new URL('../../src/index.ts', import.meta.url));
 
-// High port derived from the worker PID to dodge collisions across parallel
-// vitest workers; both children in this file run sequentially on the same port.
-const PORT = 20000 + (process.pid % 10000);
-const BASE = `http://127.0.0.1:${PORT}`;
+let port = 0;
+const baseUrl = () => `http://127.0.0.1:${port}`;
 
 /** Valid UUIDv7-shaped id, unique per index (decimal digits are valid hex). */
 const v7Id = (i: number) => `01920000-0000-7000-8000-${String(i).padStart(12, '0')}`;
 
+async function allocatePort(): Promise<number> {
+  const reservation = createServer();
+  await new Promise<void>((resolve, reject) => {
+    reservation.once('error', reject);
+    reservation.listen(0, '127.0.0.1', resolve);
+  });
+  const address = reservation.address();
+  if (!address || typeof address === 'string') {
+    reservation.close();
+    throw new Error('failed to allocate an ephemeral TCP port');
+  }
+  await new Promise<void>((resolve, reject) =>
+    reservation.close((error) => (error ? reject(error) : resolve())),
+  );
+  return address.port;
+}
+
 function spawnServer(databasePath: string): ChildProcess {
+  lastStderr = '';
   const child = spawn(process.execPath, ['--import', tsxLoaderUrl, serverEntry], {
-    env: { ...process.env, PORT: String(PORT), DATABASE_PATH: databasePath },
+    env: { ...process.env, PORT: String(port), DATABASE_PATH: databasePath },
     stdio: ['ignore', 'ignore', 'pipe'],
   });
   // Surface boot failures in the health-poll timeout instead of a silent hang.
@@ -52,18 +69,29 @@ function spawnServer(databasePath: string): ChildProcess {
 
 let lastStderr = '';
 
+function timedFetch(
+  input: string,
+  init: RequestInit = {},
+  timeoutMs = 2_000,
+): Promise<Response> {
+  return fetch(input, { ...init, signal: init.signal ?? AbortSignal.timeout(timeoutMs) });
+}
+
 /** Poll GET /health until 200 or the deadline passes (never fixed sleeps). */
-async function waitForHealth(deadlineMs = 20_000): Promise<void> {
+async function waitForHealth(child: ChildProcess, deadlineMs = 20_000): Promise<void> {
   const deadline = Date.now() + deadlineMs;
   for (;;) {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw new Error(`server exited before becoming healthy; stderr: ${lastStderr}`);
+    }
     try {
-      const res = await fetch(`${BASE}/health`);
+      const res = await timedFetch(`${baseUrl()}/health`);
       if (res.status === 200) return;
     } catch {
       // not up yet
     }
     if (Date.now() > deadline) {
-      throw new Error(`server not healthy on :${PORT} within deadline; stderr: ${lastStderr}`);
+      throw new Error(`server not healthy on :${port} within deadline; stderr: ${lastStderr}`);
     }
     await new Promise((r) => setTimeout(r, 100));
   }
@@ -82,12 +110,12 @@ async function waitForDown(deadlineMs = 5_000): Promise<void> {
   const deadline = Date.now() + deadlineMs;
   for (;;) {
     try {
-      await fetch(`${BASE}/health`);
+      await timedFetch(`${baseUrl()}/health`, {}, 500);
     } catch {
       return;
     }
     if (Date.now() > deadline) {
-      throw new Error(`server still answering on :${PORT} after SIGKILL — kill hit a wrapper?`);
+      throw new Error(`server still answering on :${port} after SIGKILL — kill hit a wrapper?`);
     }
     await new Promise((r) => setTimeout(r, 50));
   }
@@ -109,14 +137,15 @@ describe('SIGKILL / WAL crash recovery (AC 3)', () => {
     async () => {
       dir = mkdtempSync(join(tmpdir(), 'tlf-crash-'));
       const databasePath = join(dir, 'todos.db');
+      port = await allocatePort();
 
       const first = spawnServer(databasePath);
       children.push(first);
-      await waitForHealth();
+      await waitForHealth(first);
 
       // A row the server has CONFIRMED (201 received) — it must survive.
       const baselineId = v7Id(0);
-      const baselineRes = await fetch(`${BASE}/todos`, {
+      const baselineRes = await timedFetch(`${baseUrl()}/todos`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ id: baselineId, description: 'confirmed baseline row' }),
@@ -126,29 +155,42 @@ describe('SIGKILL / WAL crash recovery (AC 3)', () => {
       // Burst of POSTs, NOT all awaited; SIGKILL lands while they are in
       // flight. Each settles to its id on 201, null otherwise (killed sockets
       // reject — that's the point).
-      const burst = Array.from({ length: 20 }, (_, i) => {
+      let settled = 0;
+      const burst = Array.from({ length: 200 }, (_, i) => {
         const id = v7Id(i + 1);
-        return fetch(`${BASE}/todos`, {
+        return timedFetch(`${baseUrl()}/todos`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ id, description: `burst row ${i + 1}` }),
-        })
+        }, 10_000)
           .then((res) => (res.status === 201 ? id : null))
-          .catch(() => null);
+          .catch(() => null)
+          .finally(() => {
+            settled += 1;
+          });
       });
 
       // Let at least one burst request complete so "confirmed before the kill"
       // is non-trivial, then kill -9 — db.close() never runs, so the WAL
       // sidecar is left un-checkpointed on disk.
       await Promise.race(burst);
+      expect(settled).toBeGreaterThan(0);
+      expect(settled).toBeLessThan(burst.length);
       await killAndWait(first);
       await waitForDown();
       const confirmedIds = (await Promise.all(burst)).filter((id): id is string => id !== null);
 
       expect(existsSync(`${databasePath}-wal`)).toBe(true);
 
-      // Layer (a): direct reopen — the corruption oracle.
-      const db = new Database(databasePath);
+      // Restart the SAME production command against the crash-left WAL before
+      // any direct SQLite open can recover or checkpoint it.
+      const second = spawnServer(databasePath);
+      children.push(second);
+      await waitForHealth(second);
+
+      // Independent corruption oracle after the production process has itself
+      // reopened the crash-left database. Readonly avoids checkpointing it.
+      const db = new Database(databasePath, { readonly: true });
       try {
         const [integrity] = db.pragma('integrity_check') as Array<{ integrity_check: string }>;
         expect(integrity?.integrity_check).toBe('ok');
@@ -156,12 +198,7 @@ describe('SIGKILL / WAL crash recovery (AC 3)', () => {
         db.close();
       }
 
-      // Layer (b): restart the SAME command against the SAME DATABASE_PATH.
-      const second = spawnServer(databasePath);
-      children.push(second);
-      await waitForHealth();
-
-      const listRes = await fetch(`${BASE}/todos`);
+      const listRes = await timedFetch(`${baseUrl()}/todos`);
       expect(listRes.status).toBe(200);
       const todos = (await listRes.json()) as Array<Record<string, unknown>>;
       expect(Array.isArray(todos)).toBe(true);
@@ -192,13 +229,14 @@ describe('SIGKILL / WAL crash recovery (AC 3)', () => {
     async () => {
       dir = mkdtempSync(join(tmpdir(), 'tlf-sigterm-'));
       const databasePath = join(dir, 'todos.db');
+      port = await allocatePort();
 
       const child = spawnServer(databasePath);
       children.push(child);
-      await waitForHealth();
+      await waitForHealth(child);
 
       const id = v7Id(999);
-      const res = await fetch(`${BASE}/todos`, {
+      const res = await timedFetch(`${baseUrl()}/todos`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ id, description: 'survives graceful shutdown' }),
