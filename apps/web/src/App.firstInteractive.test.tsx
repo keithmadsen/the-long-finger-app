@@ -1,10 +1,11 @@
-import type { Todo } from '@tlf/contracts'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
+import { CAPTURE_PLACEHOLDER } from './test/appHelpers'
 import { renderWithClient } from './test/queryClient'
+import { stubTodoServer, todo } from './test/todoServer'
 
 /*
  * The "capture is sacred" invariant (AC 1, 15): the capture input MUST be the
@@ -17,22 +18,6 @@ import { renderWithClient } from './test/queryClient'
 // Anything a keyboard user can tab to, in document order.
 const INTERACTIVE_SELECTOR =
   'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
-const CAPTURE_PLACEHOLDER = 'What do you want to do?'
-
-function okResponse(payload: unknown) {
-  return new Response(JSON.stringify(payload), { status: 200 })
-}
-
-function todo(overrides: Partial<Todo> = {}): Todo {
-  return {
-    id: 'todo-1',
-    description: 'A task',
-    completed: false,
-    createdAt: '2026-06-20T09:00:00.000Z',
-    updatedAt: '2026-06-20T09:00:00.000Z',
-    ...overrides,
-  }
-}
 
 describe('first-interactive-element invariant (AC 1, 15)', () => {
   afterEach(() => {
@@ -40,10 +25,7 @@ describe('first-interactive-element invariant (AC 1, 15)', () => {
   })
 
   it('the capture input is the first interactive element in the EMPTY state', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => okResponse([])),
-    )
+    stubTodoServer()
 
     const { container } = renderWithClient(<App />)
     await screen.findByText('Your list will appear here.')
@@ -53,14 +35,12 @@ describe('first-interactive-element invariant (AC 1, 15)', () => {
   })
 
   it('the capture input precedes the row checkboxes with a SEEDED list', async () => {
-    const todos = [
-      todo({ id: 'a', description: 'active' }),
-      todo({ id: 'b', description: 'done', completed: true }),
-    ]
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => okResponse(todos)),
-    )
+    stubTodoServer({
+      initial: [
+        todo({ id: 'a', description: 'active' }),
+        todo({ id: 'b', description: 'done', completed: true }),
+      ],
+    })
 
     const { container } = renderWithClient(<App />)
     await screen.findByRole('list')
@@ -74,13 +54,7 @@ describe('first-interactive-element invariant (AC 1, 15)', () => {
 
   it('the capture input stays first and the unread-error indicator is second when a failed-create row exists (Story 1.10 AC 1)', async () => {
     // GET returns empty; POST 500s so a create fails and the indicator appears.
-    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
-      if (!init || init.method === undefined || init.method === 'GET') {
-        return okResponse([])
-      }
-      return new Response('', { status: 500 })
-    })
-    vi.stubGlobal('fetch', fetchMock)
+    stubTodoServer({ failCreates: true })
 
     const user = userEvent.setup()
     const { container } = renderWithClient(<App />)
