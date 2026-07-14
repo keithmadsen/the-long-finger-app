@@ -266,8 +266,10 @@ prevent regression where it matters most.
 each: path, number, and either why it's acceptable (e.g. bootstrap/entrypoint code,
 covered by E2E instead) or what test would close it. If nothing is below 70%, say so.⟩
 
-Not counted here: 13 Playwright E2E tests (`e2e/tests/`) and the API unit suite
-(`npm run test:unit`) exercise further paths without instrumented coverage.
+Not counted here: 23 Playwright E2E tests across 7 files (`e2e/tests/`) exercise
+further paths without instrumented coverage. (The API unit suite *is* counted
+above — the whole-`src` API run already executes both the unit and integration
+Vitest projects.)
 ```
 
 - [ ] **Step 3: Commit**
@@ -475,6 +477,11 @@ data durability across stop/start and SIGKILL.
 
 (When inserting block (b), un-escape the inner code fences — they're escaped here only to survive this plan's own fencing.)
 
+**Amendments (recorded post-execution):** the pre-existing story-1.11 "Running
+the container" README section was merged into the new compose section rather
+than duplicated, and the stale "Continuous integration" section was rewritten
+to match `.github/workflows/ci.yml` — both controller-approved mid-task.
+
 - [ ] **Step 2: Verify every README link and command**
 
 - Every relative link in the new sections resolves: `ls docs/coverage-report.md docs/security-review.md docs/ai-integration-log.md docs/bmad-implementation-narrative.md docs/wcag-conformance-matrix.md docs/screen-reader-smoke-test.md docs/k6-latency-signoff.md docs/instructions.md docs/prd.md`
@@ -509,5 +516,5 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 1. `./scripts/verify-container.sh` → `ALL CHECKS PASSED` (now includes non-root + healthcheck).
 2. `docker compose up -d --build` → `docker compose ps` shows `(healthy)`; create a todo in the browser at `http://localhost:8080`; `docker compose down && docker compose up -d` → todo still there; `docker compose down`.
-3. Walk the brief's Success Criteria table top-to-bottom and point at the artifact for each row: CRUD app ✓, coverage ≥70% → `docs/coverage-report.md`, ≥5 Playwright tests → 13 in `e2e/tests/`, `docker compose up` ✓, zero critical WCAG violations → axe gate + `docs/wcag-conformance-matrix.md`, README + AI log ✓.
+3. Walk the brief's Success Criteria table top-to-bottom and point at the artifact for each row: CRUD app ✓, coverage ≥70% → `docs/coverage-report.md`, ≥5 Playwright tests → 23 in `e2e/tests/` (7 files), `docker compose up` ✓, zero critical WCAG violations → axe gate + `docs/wcag-conformance-matrix.md`, README + AI log ✓.
 4. `nvm use 24 && npm run typecheck && npm test` — untouched, but proves the branch is merge-clean.

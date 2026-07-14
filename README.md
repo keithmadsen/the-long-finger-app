@@ -7,10 +7,11 @@ A minimal to-do application. This repository is a **workspace monorepo** with tw
 - `packages/contracts` — shared API contract types (`@tlf/contracts`).
 
 > **Status:** Feature-complete. Three epics delivered story-by-story with the BMAD method
-> (capture/view/complete → safe delete → production readiness): full CRUD with optimistic
-> UI and retry-safe idempotent creates, WCAG 2.2 AA conformance with CI-enforced gates,
-> and a hardened single-image production deploy. See `_bmad-output/` for the full
-> planning and implementation record.
+> (capture/view/complete → safe delete → production readiness): full CRUD with
+> honest-pending UI (rollback on failure, not optimistic) and retry-safe idempotent
+> creates, WCAG 2.2 AA automated gates in CI plus a scripted manual screen-reader
+> release gate, and a hardened single-image production deploy. See `_bmad-output/`
+> for the full planning and implementation record.
 
 ## Prerequisites
 

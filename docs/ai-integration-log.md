@@ -18,7 +18,7 @@ The project ran the full BMAD persona/skill chain, one phase per role, with the 
 | 1.2 contracts/schema/repo | claude-opus-4-8[1m] | #4 | 2026-06-18 |
 | 1.4 Button/TextInput primitives | **GPT-5 Codex** | #6 | 2026-06-18 |
 | 1.6 list view | claude-opus-4-8[1m] | #8 | 2026-06-22 |
-| 1.9 failed-create recovery | claude-opus-4-8[1m] | — | 2026-06-28 |
+| 1.9 failed-create recovery | claude-opus-4-8[1m] | #11 | 2026-06-28 |
 | 1.11 thin container deploy | claude-opus-4-8[1m] | #13 | 2026-07-01 |
 | 2.1 delete endpoint & mutation | claude-opus-4-8[1m] | #15 | epic-2 retro |
 | 2.2 inline two-step delete | claude-opus-4-8[1m] | #16 | epic-2 retro |

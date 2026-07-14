@@ -64,5 +64,7 @@ On the API side, `index.ts` alone accounts for 25 of the 28 uncovered lines (the
 error-handler's 5xx fallback path) — excluding the entrypoint, the API's tested surface sits at
 ~97% lines. The web aggregate is similarly dominated by its three 0% files above.
 
-Not counted here: 13 Playwright E2E tests (`e2e/tests/`) and the API unit suite
-(`npm run test:unit`) exercise further paths without instrumented coverage.
+Not counted here: 23 Playwright E2E tests across 7 files (`e2e/tests/`) exercise
+further paths without instrumented coverage. (The API unit suite *is* counted
+above — the whole-`src` API run already executes both the unit and integration
+Vitest projects.)

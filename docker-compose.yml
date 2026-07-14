@@ -2,7 +2,7 @@
 # from one origin — see Dockerfile). Two services, one image:
 #
 #   docker compose up -d                    # prod-shaped: persistent tlf-data volume
-#   docker compose --profile test up -d     # test: ephemeral tmpfs /data
+#   docker compose --profile test up -d app-test   # test: ephemeral tmpfs /data
 #
 # Env config (brief Step 3 "Environment Config"): PORT / TEST_PORT pick the host
 # port per environment; in-container the app always listens on 8080 and writes
