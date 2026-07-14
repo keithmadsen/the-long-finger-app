@@ -34,7 +34,7 @@ date: '2026-06-13'
 **Non-Functional Requirements (6).** Several are tightened by the UX spec:
 
 - **NFR-1 (Responsiveness ≤300 ms after backend response):** UX spec adds p50 submit latency ≤100 ms and p95 ≤800 ms — this binds backend choice, deployment region, and middleware.
-- **NFR-2 (Initial load <1 s for up to 100 items):** UX spec adds TTI ≤1 s on slow 3G — binds frontend payload (no webfonts, no heavy libraries) and backend cold-start behaviour.
+- **NFR-2 (Initial load <1 s locally for up to 100 items):** UX spec adds time-to-usable-list ≤10 s on the documented slow-3G profile — binds frontend payload and backend cold-start behaviour.
 - **NFR-3 (Accessibility):** WCAG 2.2 Level AA target (UX spec). Mostly frontend concern; backend needs only deterministic responses.
 - **NFR-4 (Responsive layout 320 px–desktop):** Frontend concern; single 640 px breakpoint per UX spec.
 - **NFR-5 (Maintainability):** Frontend, backend, and persistence separated so API can be tested independently from UI. Clean-architecture layering (handlers → services → domain → repositories) aligns naturally; the project includes a `clean-architecture` skill suggesting this pattern is preferred.
@@ -65,7 +65,7 @@ date: '2026-06-13'
 **Constraints derived from UX work that bind architecture choices:**
 
 - **Backend response p50 ≤100 ms, p95 ≤800 ms** (submit) — eliminates cold-start-prone serverless without warm pools; eliminates cross-region deploys for the v1 target user.
-- **TTI ≤1 s on slow 3G** — bounds frontend bundle size and rules out heavy frameworks at the UI layer; the UX spec already committed system fonts + CSS Modules / Tailwind + CSS custom property tokens + no headless library in v1.
+- **Time-to-usable-list ≤10 s on slow 3G** — bounds frontend bundle size and rules out heavy frameworks at the UI layer; the UX spec already committed system fonts + CSS Modules / Tailwind + CSS custom property tokens + no headless library in v1.
 - **DELETE idempotency:** backend must return 200/204 for already-deleted items (or the client must treat 404 as success — both acceptable; documenting the contract is the architectural commitment).
 - **Concurrent POST tolerance:** backend must accept multiple concurrent creates without serialization that could blow latency budgets.
 - **Multi-tab fence:** no server-push (websockets, SSE, polling) in v1. Stale reconciliation is GET-only.
@@ -82,7 +82,7 @@ date: '2026-06-13'
 Two amendments to the PRD were flagged in the UX spec and should be picked up by whoever owns the PRD before story creation begins:
 
 - **FR-5 amendment for hybrid placement:** *"Completed items are visually de-emphasised in place during a session, and sorted below active items on next page load. The canonical order is `completed` first (false before true), then `updatedAt` descending."*
-- **FR-3 ripple for visible character limit:** the practical visible character limit (2-line truncation, ~60–90 characters depending on viewport) is shorter than the enforced 200-character submit limit. The PRD should either accept this discrepancy or tighten the submit limit to match the visible threshold.
+- **FR-3 display contract:** the full 200-character submit maximum remains visible through responsive wrapping; there is no shorter practical display limit.
 
 These are not architecture decisions in themselves but are inputs the architecture should be aware of (the 200-char limit is what the backend validates; the 60–90-char display limit is what the frontend renders).
 
@@ -195,7 +195,7 @@ cd ../..
 
 ### Frontend Architecture
 
-- **Server state: TanStack Query v5** — `useQuery` for the list, `useMutation` for create/toggle/delete. Provides retry, error surfaces (FR-8), and refetch-on-focus for multi-tab reconciliation out of the box. ~13 KB gzip — within the TTI ≤1 s / slow-3G budget given the otherwise-lean bundle (no webfonts, no headless lib).
+- **Server state: TanStack Query v5** — `useQuery` for the list, `useMutation` for create/toggle/delete. Provides retry, error surfaces (FR-8), and refetch-on-focus for multi-tab reconciliation out of the box. ~13 KB gzip — within the approved ≤10 s slow-3G time-to-usable budget given the otherwise-lean bundle (no webfonts, no headless lib).
 - **Honest-pending with rollback machinery (NOT optimistic):** create, toggle, and delete write a *pending* state to the cache immediately (`aria-busy` at t=0, visual pending cue delayed to the ~150 ms flicker threshold per UX-DR15) and roll back on error — the item is shown as **pending, not as done**, until the backend confirms. This supersedes the earlier optimistic-UI decision: the UX spec commits honest-pending as non-negotiable for v1, and the PRD requires the backend to persist before the UI treats an item as confirmed (FR-3). The TanStack Query machinery is unchanged; only the *visual semantics* of the cache write differ (pending vs. done). Client-generated UUIDv7 still gives the pending row its final id (no temporary-id reconciliation). Perceived responsiveness comes from the sub-150 ms settle backed by the p50 ≤100 ms latency budget — not from rendering unconfirmed state as confirmed.
 - **Local UI state:** React `useState`/`useReducer` for form input + transient view state (e.g. in-session completed de-emphasis per FR-5 amendment). No global state library needed.
 - **Routing:** none — single screen (no router dependency, smaller bundle).
@@ -456,7 +456,7 @@ the-long-finger/
 
 ### Requirements Coverage Validation ✅
 
-**FRs (10/10):** all mapped in the Requirements → Structure table; their architectural homes are specified in the Data Architecture, API, and Frontend sections. **NFRs (6/6) and Non-Goals (7/7):** satisfied as documented in their respective Decisions sections. The one coverage caveat is NFR-2 — the TTI/3G bundle budget is met by design but not yet enforced as a CI gate (see Gap Analysis).
+**FRs (10/10):** all mapped in the Requirements → Structure table; their architectural homes are specified in the Data Architecture, API, and Frontend sections. **NFRs (6/6) and Non-Goals (7/7):** satisfied as documented in their respective Decisions sections. NFR-2 is protected by the absolute bundle ceiling in CI and verified by throttled production-container evidence.
 
 ### Implementation Readiness Validation ✅
 
@@ -468,7 +468,7 @@ the-long-finger/
 
 **Important Gaps (recommend addressing, non-blocking):**
 1. **PRD ratification of two architecture-introduced contract points** — (a) `POST /todos` accepts a *client-generated* UUIDv7 in the body (enables honest-pending create + idempotent retry); (b) `DELETE` returns 204 even when the row is absent. Both should be reflected back into the PRD/contract by its owner before story creation. *(Coordination item, not an architecture defect.)*
-2. **NFR-2 bundle budget is asserted but not enforced** — add a `size-limit`/bundlesize check to `ci.yml` so the TTI budget can't silently regress.
+2. **NFR-2 bundle budget — resolved in Story 3.4** by the 95,000 B gzip absolute ceiling plus recorded slow-3G production-container evidence.
 
 **Minor Gaps (optional):**
 3. `better-sqlite3` is synchronous — burst-concurrent POSTs briefly block the event loop; negligible at single-user/~100-item scale, but note WAL + fast single-row writes keep it well inside budget.

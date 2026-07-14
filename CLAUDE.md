@@ -42,11 +42,18 @@ npx playwright test --project=api       # browserless API specs only
 # CSS/quality gates (all enforced in CI)
 npm run lint:css                        # stylelint token-name lint (no literal colors / off-scale px)
 npm run lint:css:selftest               # guards the lint gate itself
-npm run contrast:check --workspace apps/web   # token contrast regression
-npm run size:check --workspace apps/web       # ratcheting gzipped bundle-size gate (needs a build first)
+npm run contrast:check --workspace apps/web   # token contrast regression (8 pairs incl. focus ring ≥3:1)
+npm run size:check --workspace apps/web       # absolute-ceiling gzipped bundle-size gate (needs a build first)
+
+# Coverage-threshold gates (delete-path scoped — Story 3.4)
+npm run test:coverage --workspace apps/web              # web tests + >90% thresholds on useArmedDelete/useDeleteTodo
+npm run test:integration:coverage --workspace apps/api  # integration + >80% thresholds on todos route/repository
+
+# k6 latency (script: e2e/load/post-todos-signoff.js; sign-off record: docs/k6-latency-signoff.md)
+docker run --rm -i -e BASE_URL=http://host.docker.internal:3001 grafana/k6 run - < e2e/load/post-todos-signoff.js
 ```
 
-CI (`.github/workflows/ci.yml`) runs: typecheck → CSS lint + selftest → web tests → contrast → web build → size gate → API unit → API integration. All are merge-blocking.
+CI (`.github/workflows/ci.yml`) runs three parallel merge-blocking jobs: `verify` (typecheck → CSS lint + selftest → web tests + delete-path coverage → contrast → web build → size ceiling → API unit → API integration + coverage), `e2e` (full unfiltered Playwright suite — includes the real-browser axe gate and the WCAG emulation gates), and `k6-smoke` (loosened-threshold POST-latency tripwire against the production container). `docs/wcag-conformance-matrix.md` maps every enumerated WCAG 2.2 AA criterion to its gate.
 
 ## Architecture
 

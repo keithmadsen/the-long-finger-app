@@ -114,7 +114,7 @@ Planning guidance — what architecture must provide so NFR validation can be au
 | NFR Category | Threshold / Requirement | Current Design Support | Gap / Decision Needed | Planned Evidence |
 |---|---|---|---|---|
 | Security | Reject malformed/oversized inputs (400); `description` rendered escaped; params-only SQL (no auth, NG-1/2) | Supported (TypeBox/Ajv at boundary; React escaping) | None | API validation tests, XSS E2E, `npm audit` |
-| Performance | NFR-1 p50≤100 ms / p95≤800 ms (submit); NFR-2 TTI≤1 s @≤100 items, slow 3G | Partial (no metrics endpoint; budget not gated) | **Q1: gating scope** (resolved → CI smoke + manual full); add `size-limit` gate | k6 summary, Lighthouse, `size-limit` report |
+| Performance | NFR-1 p50≤100 ms / p95≤800 ms (submit); NFR-2 time-to-usable≤10 s @≤100 items, slow 3G | Enforced by strict k6 evidence + Playwright timing evidence + bundle ceiling proxy | Q1 resolved in Story 3.4 | k6 summary, browser timing, size report |
 | Reliability | Zero data loss/corruption; durable across restart (NFR-6/FR-9) | Supported (atomic writes, WAL, mounted volume) — needs TC-3 seam | Fault-injection seam (TC-3); volume mount (R-009) | Integration failure-preservation + restart test, `/health` |
 | Maintainability | Layer separation; **coverage % UNDEFINED** | Supported (clean-arch boundary) | **Q2 (resolved): risk-tiered coverage** targets adopted | Coverage report, lint/arch checks, test-quality DoD |
 | Accessibility | WCAG 2.2 AA; keyboard + SR; not color alone (NFR-3) | Supported (UX committed contrast gate) | None | axe-core scan + keyboard E2E + contrast gate |

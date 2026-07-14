@@ -5,12 +5,15 @@ on:
   push:
     branches: [main]
 
-# Gate set: type-check + the two Vitest projects + the CSS token-name lint
-# (Story 1.3) + the contrast-regression, axe-core and ratcheting bundle-size
-# gates (Story 1.6 — the rendered list view now exists; epics.md Notes 14/C.14).
-# axe-core runs inside the web Vitest step (App.axe.test.tsx). Each step fails
-# the build (blocks merge) on failure. The Playwright forced-colors /
-# reduced-motion / 200%-zoom gates remain deferred to Epic 3.
+# Gate set: `verify` = type-check + the two Vitest projects (with delete-path
+# coverage thresholds) + the CSS token-name lint (Story 1.3) + the
+# contrast-regression, jsdom axe-core and absolute-ceiling bundle-size gates
+# (Stories 1.6/3.4). `e2e` = the full Playwright suite (api + chromium
+# projects, Story 3.4), which includes the real-browser axe scan and Story
+# 3.3's forced-colors / reduced-motion / 200%-zoom / responsive gates — this
+# job is what makes them merge-blocking. `k6-smoke` = loosened-threshold POST
+# latency tripwire against the production container. Each step fails the build
+# (blocks merge) on failure.
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -36,8 +39,8 @@ jobs:
       - name: CSS token-name lint self-test (guards the gate itself)
         run: npm run lint:css:selftest
 
-      - name: Web component tests (Vitest, incl. axe-core a11y gate)
-        run: npm run test --workspace apps/web
+      - name: Web component tests (Vitest, incl. jsdom axe gate + delete-path coverage thresholds)
+        run: npm run test:coverage --workspace apps/web
 
       - name: Contrast-regression gate (token source-of-truth)
         run: npm run contrast:check --workspace apps/web
@@ -51,5 +54,82 @@ jobs:
       - name: Unit tests (Vitest)
         run: npm run test:unit
 
-      - name: Integration tests (Vitest)
-        run: npm run test:integration
+      - name: Integration tests (Vitest, incl. delete-path coverage thresholds)
+        run: npm run test:integration:coverage --workspace apps/api
+
+  # Full Playwright suite (Story 3.4). Runs unfiltered — no --grep/--project —
+  # so both projects execute, including the @p1 WCAG gates in
+  # e2e/tests/ui/a11y-modes.spec.ts. Browser binaries are deliberately NOT
+  # cached: Playwright docs recommend against it (restore ≈ download time, and
+  # the OS deps installed by --with-deps are uncacheable anyway).
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E & API tests (Playwright, full suite)
+        run: npm run test:e2e
+
+      - name: Upload Playwright artifacts (report + traces)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14
+
+  # k6 latency smoke against the REAL production container (Story 3.4, AC 3/4/6)
+  # — the first CI job to exercise the Dockerfile. Thresholds are loosened ~5×
+  # from the formal sign-off numbers (p50<100/p95<800, recorded in
+  # docs/k6-latency-signoff.md): shared-runner latency is noisy enough that the
+  # strict numbers would flake, so CI acts as a regression TRIPWIRE — an order-
+  # of-magnitude latency regression still blocks the merge. A threshold breach
+  # exits k6 with code 99, failing the step with no extra wiring.
+  k6-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build production image
+        run: docker build -t tlf-app .
+
+      - name: Run container (fresh volume — cold start, matching the script's documented profile)
+        run: docker run -d --name tlf -p 3001:8080 tlf-app
+
+      - name: Wait for /health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3001/health >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API never became healthy" >&2
+          docker logs tlf
+          exit 1
+
+      - name: Set up k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: k6 smoke (loosened thresholds — tripwire, not the sign-off)
+        run: k6 run e2e/load/post-todos-signoff.js -e BASE_URL=http://localhost:3001 -e P50_MS=500 -e P95_MS=2000
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs tlf

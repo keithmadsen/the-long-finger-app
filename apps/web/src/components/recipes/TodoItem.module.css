@@ -1,6 +1,6 @@
 /*
  * Task row. The whole-row <label> is the tap target (UX-DR13). Checkbox aligns
- * to the first text line; the description grows to two lines then truncates.
+ * to the first text line; the description grows to expose its complete text.
  */
 .item {
   display: flex;
@@ -12,23 +12,13 @@
   color: var(--color-on-surface);
 }
 
-/*
- * 2-line truncation (AC 4). The line-clamp box keeps the row height stable per
- * state: clamp + ellipsis at two lines, regardless of Active/Complete. min-width:0
- * lets the clamp take effect inside the flex row. -webkit-line-clamp is the
- * cross-browser-supported clamp idiom; the -webkit- prefixes are required and
- * intentional (the build has no autoprefixer).
- */
+/* Complete descriptions remain visible at narrow widths and under WCAG 1.4.12
+ * user spacing overrides. `overflow-wrap` contains contract-max unbroken text
+ * without reintroducing clipping or page-level horizontal scrolling. */
 .description {
   flex: 1;
   min-width: 0;
-  /* stylelint-disable value-no-vendor-prefix, property-no-vendor-prefix -- the -webkit-box line-clamp idiom is the only cross-browser 2-line truncation; no autoprefixer in the build. */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  /* stylelint-enable value-no-vendor-prefix, property-no-vendor-prefix */
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
   font-size: var(--font-size-item);
   line-height: var(--line-height-item);
 }
@@ -168,7 +158,7 @@
 
 /*
  * Reserve the wider armed label's width while idle. Without this, Delete→Confirm
- * can steal inline space from the clamped description and change row height.
+ * can steal inline space from the description and change row height.
  */
 .delete::after {
   display: block;
