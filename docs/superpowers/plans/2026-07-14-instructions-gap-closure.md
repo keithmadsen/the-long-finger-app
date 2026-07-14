@@ -119,7 +119,7 @@ Closes the brief's named success criterion "application runs successfully via do
 
 **Interfaces:**
 - Consumes: Task 1's image (HEALTHCHECK is inherited by compose; `docker compose ps` shows `(healthy)`).
-- Produces: services `app` (default, persistent named volume `tlf-data`) and `app-test` (profile `test`, ephemeral anonymous volume). Env vars: `PORT` (host port for `app`, default 8080), `TEST_PORT` (host port for `app-test`, default 18080).
+- Produces: services `app` (default, persistent named volume `tlf-data`) and `app-test` (profile `test`, ephemeral tmpfs `/data` — Keith's call 2026-07-14: an anonymous volume was rejected because its `down -v` teardown also deletes `tlf-data`). Env vars: `PORT` (host port for `app`, default 8080), `TEST_PORT` (host port for `app-test`, default 18080).
 
 - [ ] **Step 1: Write docker-compose.yml**
 
@@ -128,7 +128,7 @@ Closes the brief's named success criterion "application runs successfully via do
 # from one origin — see Dockerfile). Two services, one image:
 #
 #   docker compose up -d                    # prod-shaped: persistent tlf-data volume
-#   docker compose --profile test up -d     # test: ephemeral anonymous /data volume
+#   docker compose --profile test up -d     # test: ephemeral tmpfs /data
 #
 # Env config (brief Step 3 "Environment Config"): PORT / TEST_PORT pick the host
 # port per environment; in-container the app always listens on 8080 and writes
@@ -151,8 +151,13 @@ services:
     image: tlf-app
     ports:
       - "${TEST_PORT:-18080}:8080"
-    volumes:
-      - /data   # anonymous volume: node-owned like the image dir, discarded with `down -v`
+    # Ephemeral tmpfs /data, node-owned via inline uid/gid (a bare tmpfs mounts
+    # root-owned and the app runs as the non-root node user; the compose-spec
+    # long form accepts only size/mode, so inline options are the only way to
+    # get ownership). Dies with the container, so no `-v` teardown is ever
+    # needed — compose `down -v` would also delete tlf-data.
+    tmpfs:
+      - /data:uid=1000,gid=1000
 
 volumes:
   tlf-data:
@@ -183,7 +188,8 @@ docker compose down
 docker compose --profile test up -d app-test
 sleep 5 && curl -s http://localhost:18080/health                # {"status":"ok"}
 curl -s http://localhost:18080/todos                            # [] — no bleed from tlf-data
-docker compose --profile test down -v                           # anonymous volume discarded
+docker compose --profile test down                              # tmpfs /data dies with the container; NEVER use -v here (it deletes tlf-data too)
+docker volume inspect tlf_tlf-data >/dev/null && echo tlf-data-intact   # prod volume untouched
 ```
 
 - [ ] **Step 4: Commit**
@@ -217,6 +223,15 @@ npm run test:integration:coverage --workspace apps/api 2>&1 | tee /tmp/api-cover
 ```
 
 Expected: both suites PASS (they run in CI on every merge). Copy each run's full `% Coverage report` summary table — especially the `All files` row (Stmts / Branch / Funcs / Lines).
+
+**Amendment (discovered in execution):** the npm scripts' vitest configs set `coverage.include` to the delete-path files only, so their "All files" rows are gate-scope numbers, not whole-codebase numbers. For the true overall figures, additionally run vitest with a CLI include override (no config changes):
+
+```bash
+npx vitest run --coverage --coverage.include='src/**' --root apps/web
+npx vitest run --coverage --coverage.include='src/**' --root apps/api
+```
+
+The doc's "Overall numbers" table records these whole-src runs (with the exact commands); the npm-script gate-scope numbers move to the "Enforced thresholds" section.
 
 - [ ] **Step 2: Write docs/coverage-report.md**
 
@@ -434,11 +449,11 @@ docker compose logs -f app      # structured pino logs
 docker compose down             # todos persist in the tlf-data volume; add -v to reset
 ​```
 
-An ephemeral instance for testing (no persistent volume, port 18080):
+An ephemeral instance for testing (tmpfs storage, port 18080):
 
 ​```bash
 docker compose --profile test up -d app-test
-docker compose --profile test down -v
+docker compose --profile test down
 ​```
 
 The container runs as the non-root `node` user, reports liveness via a Docker
