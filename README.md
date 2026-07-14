@@ -6,7 +6,11 @@ A minimal to-do application. This repository is a **workspace monorepo** with tw
 - `apps/web` — React + Vite frontend.
 - `packages/contracts` — shared API contract types (`@tlf/contracts`).
 
-> **Status:** Story 1.1 — *walking skeleton*. One thin vertical slice (`browser → Vite proxy → Fastify → awilix cradle → repository → on-disk SQLite → back`) is wired end-to-end to prove the architecture. No features beyond that slice exist yet.
+> **Status:** Feature-complete. Three epics delivered story-by-story with the BMAD method
+> (capture/view/complete → safe delete → production readiness): full CRUD with optimistic
+> UI and retry-safe idempotent creates, WCAG 2.2 AA conformance with CI-enforced gates,
+> and a hardened single-image production deploy. See `_bmad-output/` for the full
+> planning and implementation record.
 
 ## Prerequisites
 
@@ -59,6 +63,35 @@ npm run dev:api    # API only
 npm run dev:web    # web only
 ```
 
+## Run (production, Docker Compose)
+
+One image serves the API and the built SPA from a single origin:
+
+```bash
+docker compose up -d --build    # http://localhost:8080  (override host port: PORT=9090 docker compose up -d)
+docker compose logs -f app      # structured pino logs
+docker compose down             # todos persist in the tlf-data volume; add -v to reset
+```
+
+An ephemeral instance for testing (tmpfs storage, port 18080):
+
+```bash
+docker compose --profile test up -d app-test
+docker compose --profile test down
+```
+
+The container runs as the non-root `node` user, reports liveness via a Docker
+`HEALTHCHECK` against `/health`, and shuts down gracefully on SIGTERM (WAL
+checkpoint included). `./scripts/verify-container.sh` proves all of this plus
+data durability across stop/start and SIGKILL.
+
+Once healthy, `http://localhost:8080` serves the app; `GET /health` returns
+`{"status":"ok"}` and `/docs` serves the OpenAPI UI. A strict
+Content-Security-Policy, `@fastify/helmet` baseline headers, and
+COEP/CORP-hardened static serving are enforced on every response (Story 3.5)
+— see [`docs/security-review.md`](docs/security-review.md) for the full
+write-up.
+
 ## Test
 
 ```bash
@@ -75,44 +108,13 @@ The integration test builds the Fastify app against a real temp-file SQLite data
 npm run typecheck        # tsc --noEmit across all workspaces
 ```
 
-## Running the container
-
-The app ships as a single multi-stage image (`Dockerfile` at the repo root). The
-builder stage installs dependencies and builds the web SPA; the runner stage
-serves both the built SPA and the four API routes from **one origin / one port**
-via Fastify + `@fastify/static`. There is no Vite proxy and no CORS in
-production — the web app's relative `fetch('/todos')` calls resolve same-origin.
-
-Build and run, mounting a named volume so the SQLite database survives restarts:
-
-```bash
-docker build -t the-long-finger .
-docker run -p 8080:8080 -e PORT=8080 -e DATABASE_PATH=/data/todos.db -v tlf-data:/data the-long-finger
-```
-
-Then open `http://localhost:8080` to view, add, and complete/uncomplete tasks.
-`GET /health` returns `{"status":"ok"}` and `/docs` serves the OpenAPI UI.
-
-**Config:** the image reads `PORT` and `DATABASE_PATH` from the environment and
-ships container defaults (`PORT=8080`, `DATABASE_PATH=/data/todos.db`). `/data`
-is declared as a volume; the API creates the parent directory on first boot, so
-a fresh volume initialises cleanly.
-
-**Persistence check:** create a task, then stop and restart the container with
-the **same** volume — the task is still present:
-
-```bash
-docker stop <container>
-docker start <container>   # restarts the same container, which already has tlf-data mounted
-```
-
-> **Security headers:** the API applies `@fastify/helmet` baseline headers and a
-> 64 KiB request-body limit. A strict Content-Security-Policy and hardened
-> static-serving headers (COEP/CORP) are intentionally deferred to Epic 3
-> Story 3.5 — enabling helmet's default CSP now would break the bundled SPA.
-
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every pull request: install → type-check → Vitest `unit` project → Vitest `integration` project. Any failure blocks merge.
+`.github/workflows/ci.yml` runs three parallel jobs on every pull request, each merge-blocking: **`verify`** (type-check → CSS token lint + its self-test → web tests with delete-path coverage thresholds → contrast-regression gate → web build → bundle-size ceiling → API unit → API integration with coverage thresholds), **`e2e`** (the full unfiltered Playwright suite, including the real-browser axe gate and the WCAG forced-colors / reduced-motion / zoom / responsive emulation gates), and **`k6-smoke`** (a loosened-threshold POST-latency tripwire that builds and runs the production Docker image — so the container is exercised on every PR).
 
-The Docker image build is verified manually (build + run + browser + restart-persistence); it is intentionally **not** part of the per-PR CI gate (CI expansion is owned by Epic 3).
+## Project documentation
+
+- [Training brief](docs/instructions.md) — the original assignment this project implements
+- [PRD](docs/prd.md) · [BMAD implementation narrative](docs/bmad-implementation-narrative.md) · full artifact record in `_bmad-output/`
+- [AI integration log](docs/ai-integration-log.md)
+- QA reports: [coverage](docs/coverage-report.md) · [security review](docs/security-review.md) · [WCAG conformance matrix](docs/wcag-conformance-matrix.md) · [screen-reader smoke test](docs/screen-reader-smoke-test.md) · [k6 latency sign-off](docs/k6-latency-signoff.md)
