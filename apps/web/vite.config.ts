@@ -19,5 +19,21 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // Delete-path P0 coverage gate (Story 3.4; epic-1 retro item 7 targets).
+    // Scoped to the delete-path modules — the P0 interaction's state machine
+    // and mutation — NOT blanket global numbers: a global threshold would
+    // dilute the signal across unrelated files and let the P0 path regress
+    // behind an average. Enforced only when run with --coverage
+    // (`npm run test:coverage`, the CI web-test step).
+    coverage: {
+      provider: 'v8',
+      include: ['src/hooks/useArmedDelete.ts', 'src/hooks/useDeleteTodo.ts'],
+      thresholds: {
+        statements: 90,
+        branches: 90,
+        functions: 90,
+        lines: 90,
+      },
+    },
   },
 })

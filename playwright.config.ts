@@ -50,9 +50,10 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
     // Emulation gates (Story 3.3) are per-test `page.emulateMedia()` /
-    // `setViewportSize()` calls in e2e/tests/ui/a11y-modes.spec.ts — dedicated
-    // projects would only re-run whole suites under emulation (a Story 3.4
-    // scale decision if ever wanted).
+    // `setViewportSize()` calls in e2e/tests/ui/a11y-modes.spec.ts. Dedicated
+    // whole-suite emulation projects were DECLINED (Keith, 2026-07-14, Story
+    // 3.4): they would multiply chromium CI time with no new assertion
+    // coverage. Decision recorded in docs/wcag-conformance-matrix.md.
   ],
   // Boot the full app (Fastify API + Vite web) against an isolated SQLite file
   // so E2E runs never touch dev data. DATABASE_PATH is resolved relative to

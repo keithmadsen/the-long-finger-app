@@ -160,6 +160,37 @@ describe('useArmedDelete', () => {
     expect(onCommit).not.toHaveBeenCalled()
   })
 
+  // Story 3.4 (delete-path coverage gate): the tap-away listener's two
+  // branches at the hook level — TodoList exercises the revert path through
+  // the component, but the [data-armed-delete] guard (don't revert when the
+  // pointer lands INSIDE the armed affordance) had no direct test.
+  describe('tap-away pointerdown (AC 5)', () => {
+    it('a pointerdown INSIDE the armed affordance does NOT revert ([data-armed-delete] guard)', () => {
+      const { result, press } = setup()
+      const affordance = document.createElement('button')
+      affordance.setAttribute('data-armed-delete', '')
+      document.body.append(affordance)
+
+      press('a')
+      act(() => {
+        affordance.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+      })
+      expect(result.current.armedId).toBe('a')
+
+      affordance.remove()
+    })
+
+    it('a pointerdown anywhere else reverts to idle', () => {
+      const { result, press } = setup()
+
+      press('a')
+      act(() => {
+        document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+      })
+      expect(result.current.armedId).toBeNull()
+    })
+  })
+
   // Story 2.3 (AC 6): the three named delete state-machine races, driven
   // deterministically by the injectable clock (never vi.useFakeTimers).
   describe('state-race hardening (Story 2.3 AC 6)', () => {

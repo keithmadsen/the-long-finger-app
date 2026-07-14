@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
-    "test:integration": "vitest run --project integration"
+    "test:integration": "vitest run --project integration",
+    "test:integration:coverage": "vitest run --project integration --coverage"
   },
   "dependencies": {
     "@fastify/awilix": "^7",
@@ -27,6 +28,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7",
     "@types/node": "^24",
+    "@vitest/coverage-v8": "^4.1.10",
     "tsx": "^4",
     "typescript": "^5",
     "vitest": "^4"
