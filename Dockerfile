@@ -62,7 +62,7 @@ USER node
 # Orchestrator-facing liveness: Node 24's global fetch against the API's own
 # /health route — node:24-slim ships no curl/wget, and this avoids adding one.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 8080) + '/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+  CMD ["node", "-e", "const p=Number((process.env.PORT ?? '8080').trim()); fetch('http://127.0.0.1:' + p + '/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
 
 # Exec-form direct invocation so PID 1 is node itself (Story 3.5): npm as PID 1
 # does not reliably forward SIGTERM, so `docker stop` used to wait the full 10s

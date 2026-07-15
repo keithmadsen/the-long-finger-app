@@ -78,7 +78,7 @@ An ephemeral instance for testing (tmpfs storage, port 18080):
 
 ```bash
 docker compose --profile test up -d app-test
-docker compose --profile test down
+docker compose --profile test rm -sf app-test
 ```
 
 The container runs as the non-root `node` user, reports liveness via a Docker
@@ -86,12 +86,16 @@ The container runs as the non-root `node` user, reports liveness via a Docker
 checkpoint included). `./scripts/verify-container.sh` proves all of this plus
 data durability across stop/start and SIGKILL.
 
+The non-root image supports fresh `node`-owned volumes only. Volumes created by
+the older root-running image are not supported because their ownership can make
+`/data` unwritable; create a fresh volume before upgrading to this image.
+
 Once healthy, `http://localhost:8080` serves the app; `GET /health` returns
 `{"status":"ok"}` and `/docs` serves the OpenAPI UI. A strict
 Content-Security-Policy, `@fastify/helmet` baseline headers, and
-COEP/CORP-hardened static serving are enforced on every response (Story 3.5)
-— see [`docs/security-review.md`](docs/security-review.md) for the full
-write-up.
+COEP/CORP-hardened static serving protect the app and API (Story 3.5). The
+`/docs` Swagger UI intentionally substitutes its own, looser static-asset CSP;
+see [`docs/security-review.md`](docs/security-review.md) for the full write-up.
 
 ## Test
 
@@ -111,7 +115,7 @@ npm run typecheck        # tsc --noEmit across all workspaces
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs three parallel jobs on every pull request, each merge-blocking: **`verify`** (type-check → CSS token lint + its self-test → web tests with delete-path coverage thresholds → contrast-regression gate → web build → bundle-size ceiling → API unit → API integration with coverage thresholds), **`e2e`** (the full unfiltered Playwright suite, including the real-browser axe gate and the WCAG forced-colors / reduced-motion / zoom / responsive emulation gates), and **`k6-smoke`** (a loosened-threshold POST-latency tripwire that builds and runs the production Docker image — so the container is exercised on every PR).
+`.github/workflows/ci.yml` runs three parallel jobs on every pull request: **`verify`** (type-check → CSS token lint + its self-test → web tests with delete-path coverage thresholds → contrast-regression gate → web build → bundle-size ceiling → API unit → API integration with coverage thresholds), **`e2e`** (the full unfiltered Playwright suite, including the real-browser axe gate and the WCAG forced-colors / reduced-motion / zoom / responsive emulation gates), and **`k6-smoke`** (a loosened-threshold POST-latency tripwire that builds and runs the production Docker image — so the container is exercised on every PR). Each job fails on a violated gate; whether that failure blocks merging depends on the repository's branch-protection or ruleset configuration.
 
 ## Project documentation
 

@@ -33,6 +33,22 @@ The project ran the full BMAD persona/skill chain, one phase per role, with the 
 
 **Keith's separate code-review pass, per story — a deliberate practice.** `sprint-status.yaml`'s workflow notes are explicit: "Dev moves story to 'review', then runs code-review (**fresh context, different LLM recommended**)." Every story's Change Log shows a distinct review pass after `dev-story` (e.g. 1.2 had three rounds of "Addressed code review findings"; 3.4 had 11 findings resolved in a dedicated pass; 3.5's review findings list is in the story file's Review Findings section). This fresh-context/different-model discipline was Keith running the review workflow himself, deliberately, as a check independent of whichever model had just written the code — not an artifact of tooling limits.
 
+**Prompts that worked best (Keith-reviewed 2026-07-14).** Verbatim prompt transcripts were not
+retained, so these are the confirmed prompt patterns visible in the resulting artifacts:
+
+- Anchor work to numbered acceptance criteria, exact file boundaries, and executable verification
+  commands. Story 3.5 and this gap-closure plan both pair each requested change with the expected
+  failing/passing observation, which kept infrastructure work testable.
+- Tell the agent to surface contradictions instead of silently weakening a target. Story 3.4's
+  explicit instruction not to hide the slow-3G budget conflict produced a measured result and a
+  recorded Keith decision instead of a convenient passing number.
+- Review from fresh context with separate roles for general defects, reachable edge cases, and
+  acceptance compliance. The story review logs show that this adversarial separation repeatedly
+  found issues after the implementation agent considered the work complete.
+- State scope exclusions and decision ownership directly (for example, no CI changes and “Keith's
+  call” items). This prevented agents from expanding a story while preserving unresolved choices
+  in `deferred-work.md` or the sprint log.
+
 **`bmad-retrospective`.** Two retros ran: `epic-1-retro-2026-07-01.md` (facilitated by "Amelia (Developer)", participants Keith/Amelia/Winston/John/Murat) and `epic-2-retro-2026-07-01.md` (same facilitator, + Sally). Both produced action items, a tooling-decision table, and an accountability scorecard against the prior retro's commitments (epic-2 retro: "2 exemplary, 1 partial, 3 evaporated, 1 N/A").
 
 **`bmad-testarch-framework`.** Stood up the Playwright harness on 2026-07-04 (`_bmad-output/test-artifacts/framework-setup-progress.md`, `workflowStatus: completed`), landing as PR #20 — confirmed in `sprint-status.yaml`: "Playwright e2e harness stood up via testarch-framework (PR #20) — 4 sample specs green."
@@ -89,4 +105,4 @@ Where the record shows a decision explicitly attributed to Keith rather than res
 
 ---
 
-*Maintained retrospectively on 2026-07-14 from the project record (`sprint-status.yaml`, the Epic 1/2 retrospectives, `deferred-work.md`, and the cited story files). This branch's own execution — `chore/instructions-gap-closure` — was itself carried out by AI agents coordinated per task, including the writing of this document; Keith's review of this log, especially the model-usage claims and the "what worked best" judgment calls in §1, is pending.*
+*Maintained retrospectively on 2026-07-14 from the project record (`sprint-status.yaml`, the Epic 1/2 retrospectives, `deferred-work.md`, and the cited story files). This branch's own execution — `chore/instructions-gap-closure` — was itself carried out by AI agents coordinated per task, including the writing of this document. Keith reviewed and confirmed the model/MCP-usage claims and the “what worked best” guidance during PR #29 review on 2026-07-14.*

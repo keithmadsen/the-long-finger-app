@@ -14,7 +14,7 @@ services:
     build: .
     image: tlf-app
     ports:
-      - "${PORT:-8080}:8080"
+      - "127.0.0.1:${PORT:-8080}:8080"
     volumes:
       - tlf-data:/data
     restart: unless-stopped
@@ -24,7 +24,7 @@ services:
     build: .
     image: tlf-app
     ports:
-      - "${TEST_PORT:-18080}:8080"
+      - "127.0.0.1:${TEST_PORT:-18080}:8080"
     # Ephemeral tmpfs /data, node-owned via inline uid/gid (a bare tmpfs mounts
     # root-owned and the app runs as the non-root node user; the compose-spec
     # long form accepts only size/mode, so inline options are the only way to
