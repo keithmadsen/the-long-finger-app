@@ -181,13 +181,19 @@ test.describe('delete path (Story 3.4, @p0 regression net)', () => {
       // Concurrent arm/submit: with the slow-create POST held in flight,
       // commit a delete of ANOTHER row meanwhile — the two mutations must not
       // contaminate each other.
-      const slowPostSettled = page.waitForResponse(
-        (response) =>
-          response.request().method() === 'POST' &&
-          response.status() === 201 &&
-          (response.request().postDataJSON() as { description?: string })
-            ?.description === slowCreate,
-      )
+      let slowCreateSettled = false
+      const slowPostSettled = page
+        .waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            response.status() === 201 &&
+            (response.request().postDataJSON() as { description?: string })
+              ?.description === slowCreate,
+        )
+        .then((response) => {
+          slowCreateSettled = true
+          return response
+        })
       await input.fill(slowCreate)
       await input.press('Enter')
       const pendingRow = page.getByRole('listitem').filter({ hasText: slowCreate })
@@ -206,6 +212,10 @@ test.describe('delete path (Story 3.4, @p0 regression net)', () => {
       )
       await confirmButton(seededRowLocator).click()
       await deleteResponse
+      // The gate makes the overlap structural; assert it explicitly so a
+      // refactor away from the gate (or a route mismatch letting the POST
+      // through early) can't quietly turn this test sequential.
+      expect(slowCreateSettled).toBe(false)
       await expect(seededRowLocator).toHaveCount(0)
 
       // The in-flight create settles untouched by the delete: the row confirms

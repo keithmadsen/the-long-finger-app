@@ -49,19 +49,26 @@ test.describe('screen-reader contract (Story 3.2)', () => {
     // row is UI-created, so from here cleanup must run even on a failed
     // assertion (delete-path precedent): try/finally, not inline at the end.
     const createdName = `sr created ${stamp}`
+    // Deferred-release PATCH gate (delete-path precedent): hold the toggle
+    // mutation until the pending-state assertions have run, then release. A
+    // fixed delay races those assertions on a slow runner and burns wall clock.
+    let releasePatch: () => void = () => undefined
+    const patchGate = new Promise<void>((resolve) => {
+      releasePatch = resolve
+    })
     try {
       const input = page.getByPlaceholder(CAPTURE_PLACEHOLDER)
       await input.fill(createdName)
       await input.press('Enter')
       await expect(region).toContainText(`${createdName} added.`)
 
-      // AC 1/2 — a slowed PATCH holds the row aria-busy until settle; the toggle
-      // announcement fires on backend confirm, never on submit.
+      // AC 1/2 — the held PATCH keeps the row aria-busy until settle; the
+      // toggle announcement fires on backend confirm, never on submit.
       const delayedPatch = interceptNetworkCall({
         method: 'PATCH',
         url: '/todos/*',
         handler: async (route) => {
-          await new Promise((resolve) => setTimeout(resolve, 800))
+          await patchGate
           await route.continue()
         },
       })
@@ -71,6 +78,7 @@ test.describe('screen-reader contract (Story 3.2)', () => {
       await expect(toggleRow).toHaveAttribute('aria-busy', 'true')
       // Pending is silent: the region still holds the create confirmation.
       expect(await region.textContent()).not.toContain('marked complete.')
+      releasePatch()
       await delayedPatch
       await expect(region).toContainText(`${toggleName} marked complete.`)
       // Settled: React removes aria-busy={false} from the DOM entirely.
@@ -105,6 +113,8 @@ test.describe('screen-reader contract (Story 3.2)', () => {
         `${dupName} deleted.`,
       )
     } finally {
+      // Never leave the routed PATCH hanging if an assertion above fails.
+      releasePatch()
       // Self-cleaning: the UI-created row's client-generated id is unknown, so
       // reconcile against the API and delete by description (smoke-spec pattern).
       const { body } = await apiRequest<Array<{ id: string; description: string }>>({
