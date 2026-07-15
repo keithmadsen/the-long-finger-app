@@ -5,21 +5,12 @@ import type { CreateTodoBody } from '@tlf/contracts';
 import { applySchema } from '../db/schema.js';
 import { todoRepository } from './todo.repository.js';
 import type { Dependencies } from '../types/cradle.js';
+import { seedTodoRow } from '../../test/fixtures/todo.factory.js';
 
 function repoWithMemoryDb() {
   const db = new Database(':memory:');
   applySchema(db);
   return { db, repo: todoRepository({ db } as Dependencies) };
-}
-
-function seed(
-  db: Database.Database,
-  row: { id: string; description: string; completed: 0 | 1; created_at: string; updated_at: string },
-): void {
-  db.prepare(
-    `INSERT INTO todos (id, description, completed, created_at, updated_at)
-     VALUES (@id, @description, @completed, @created_at, @updated_at)`,
-  ).run(row);
 }
 
 describe('@tlf/contracts surface (AC 1)', () => {
@@ -42,21 +33,21 @@ describe('todoRepository', () => {
 
   it('listTodos() returns canonical order: completed ASC, updated_at DESC (AC 3)', () => {
     const { db, repo } = repoWithMemoryDb();
-    seed(db, {
+    seedTodoRow(db, {
       id: 'completed-newer',
       description: 'Completed newer',
       completed: 1,
       created_at: '2026-06-17T09:00:00.000Z',
       updated_at: '2026-06-17T12:00:00.000Z',
     });
-    seed(db, {
+    seedTodoRow(db, {
       id: 'active-older',
       description: 'Active older',
       completed: 0,
       created_at: '2026-06-17T09:00:00.000Z',
       updated_at: '2026-06-17T10:00:00.000Z',
     });
-    seed(db, {
+    seedTodoRow(db, {
       id: 'active-newer',
       description: 'Active newer',
       completed: 0,
@@ -74,7 +65,7 @@ describe('todoRepository', () => {
 
   it('maps rows to the exact camelCase Todo shape with boolean completed (AC 4)', () => {
     const { db, repo } = repoWithMemoryDb();
-    seed(db, {
+    seedTodoRow(db, {
       id: 'mapped',
       description: 'Mapped row',
       completed: 1,
@@ -135,7 +126,7 @@ describe('todoRepository', () => {
 
   it('updateTodo() flips completed, advances updated_at, leaves created_at, returns the mapped Todo (1.8 AC 7)', () => {
     const { db, repo } = repoWithMemoryDb();
-    seed(db, {
+    seedTodoRow(db, {
       id: 'toggle-me',
       description: 'Toggle me',
       completed: 0,
@@ -160,7 +151,7 @@ describe('todoRepository', () => {
 
   it('updateTodo() can uncomplete (true → false) round-trips boolean ↔ 0/1', () => {
     const { db, repo } = repoWithMemoryDb();
-    seed(db, {
+    seedTodoRow(db, {
       id: 'done',
       description: 'Already done',
       completed: 1,
@@ -181,7 +172,7 @@ describe('todoRepository', () => {
 
   it('deleteTodo() removes an existing row, returns true, and drops it from listTodos() (2.1 AC 1, 5)', () => {
     const { db, repo } = repoWithMemoryDb();
-    seed(db, {
+    seedTodoRow(db, {
       id: 'to-delete',
       description: 'Delete me',
       completed: 0,

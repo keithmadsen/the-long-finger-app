@@ -4,48 +4,11 @@ import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { makeFakeClock } from '../test/fakeClock'
 import { createTestQueryClient } from '../test/queryClient'
 import { CREATE_TIMEOUT_MS, useCreateTodo } from './useCreateTodo'
 import type { PendingClock } from './usePendingPresentation'
 import { useTodos } from './useTodos'
-
-/*
- * A controllable clock implementing PendingClock (Story 1.9): the test advances
- * `now` to simulate a wall-clock time jump (backgrounded tab / laptop sleep) and
- * fires due timers manually — no real wall-clock waits. Mirrors the injectable
- * clock seam the honest-pending presentation uses.
- */
-function makeFakeClock(start = 0) {
-  let now = start
-  let nextId = 1
-  const timers = new Map<number, { fn: () => void; at: number }>()
-  return {
-    now: () => now,
-    setTimeout: (fn: () => void, ms: number) => {
-      const id = nextId++
-      timers.set(id, { fn, at: now + ms })
-      return id
-    },
-    clearTimeout: (handle: unknown) => {
-      timers.delete(handle as number)
-    },
-    advance(ms: number) {
-      now += ms
-    },
-    /** Fire every timer whose deadline has been reached. */
-    runDue() {
-      for (const [id, timer] of [...timers]) {
-        if (timer.at <= now) {
-          timers.delete(id)
-          timer.fn()
-        }
-      }
-    },
-  } satisfies PendingClock & {
-    advance(ms: number): void
-    runDue(): void
-  }
-}
 
 function existing(overrides: Partial<Todo> = {}): Todo {
   return {
@@ -458,7 +421,7 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
   })
 
   it('the wall-clock timeout fails a still-pending create via the armed timer, WITHOUT aborting it (AC 6)', async () => {
-    const clock = makeFakeClock()
+    const fake = makeFakeClock()
     const client = createTestQueryClient()
     client.setQueryData<Todo[]>(['todos'], [])
     let capturedSignal: AbortSignal | null = null
@@ -473,7 +436,7 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
     vi.stubGlobal('fetch', fetchMock)
     const announce = vi.fn()
 
-    const { result } = setup(client, announce, clock)
+    const { result } = setup(client, announce, fake.clock)
     act(() => result.current.submit('slow task'))
 
     await waitFor(() =>
@@ -481,10 +444,7 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
     )
 
     // Jump past the deadline and fire the armed timer.
-    act(() => {
-      clock.advance(CREATE_TIMEOUT_MS + 1)
-      clock.runDue()
-    })
+    act(() => fake.advance(CREATE_TIMEOUT_MS + 1))
 
     await waitFor(() =>
       expect(result.current.failedCreates.map((t) => t.description)).toContain(
@@ -500,7 +460,7 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
   })
 
   it('the timeout also fires on visibilitychange after a backgrounded time jump (AC 6)', async () => {
-    const clock = makeFakeClock()
+    const fake = makeFakeClock()
     const client = createTestQueryClient()
     client.setQueryData<Todo[]>(['todos'], [])
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
@@ -517,17 +477,17 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
       get: () => 'visible',
     })
 
-    const { result } = setup(client, vi.fn(), clock)
+    const { result } = setup(client, vi.fn(), fake.clock)
     act(() => result.current.submit('woke from sleep'))
     await waitFor(() =>
       expect(client.getQueryData<Todo[]>(['todos'])).toHaveLength(1),
     )
 
     // The tab was backgrounded across the deadline (the armed setTimeout is
-    // throttled/suspended — we deliberately do NOT runDue). On foreground the
-    // visibilitychange re-check immediately fails the over-deadline row.
+    // throttled/suspended — jump() deliberately does NOT fire it). On foreground
+    // the visibilitychange re-check immediately fails the over-deadline row.
     act(() => {
-      clock.advance(CREATE_TIMEOUT_MS + 1)
+      fake.jump(CREATE_TIMEOUT_MS + 1)
       document.dispatchEvent(new Event('visibilitychange'))
     })
 
@@ -539,7 +499,7 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
   })
 
   it('dismiss removes a failed row and aborts its still-in-flight request (AC 3)', async () => {
-    const clock = makeFakeClock()
+    const fake = makeFakeClock()
     const client = createTestQueryClient()
     client.setQueryData<Todo[]>(['todos'], [])
     let aborted = false
@@ -557,17 +517,14 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
     vi.stubGlobal('fetch', fetchMock)
     const announce = vi.fn()
 
-    const { result } = setup(client, announce, clock)
+    const { result } = setup(client, announce, fake.clock)
     act(() => result.current.submit('cancel me'))
     await waitFor(() =>
       expect(client.getQueryData<Todo[]>(['todos'])).toHaveLength(1),
     )
 
     // Timeout → failed, request still in flight (controller still alive).
-    act(() => {
-      clock.advance(CREATE_TIMEOUT_MS + 1)
-      clock.runDue()
-    })
+    act(() => fake.advance(CREATE_TIMEOUT_MS + 1))
     await waitFor(() => expect(result.current.failedCreates).toHaveLength(1))
     expect(announce).toHaveBeenCalledTimes(1)
     const id = result.current.failedCreates[0]!.id
@@ -587,7 +544,7 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
   })
 
   it('a late success after a timeout→failed clears the failed row (AC 6 lifecycle)', async () => {
-    const clock = makeFakeClock()
+    const fake = makeFakeClock()
     const client = createTestQueryClient()
     client.setQueryData<Todo[]>(['todos'], [])
     let resolvePost: ((response: Response) => void) | undefined
@@ -618,16 +575,13 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
     vi.stubGlobal('fetch', fetchMock)
     const announce = vi.fn()
 
-    const { result } = setup(client, announce, clock)
+    const { result } = setup(client, announce, fake.clock)
     act(() => result.current.submit('eventually saves'))
     await waitFor(() =>
       expect(client.getQueryData<Todo[]>(['todos'])).toHaveLength(1),
     )
 
-    act(() => {
-      clock.advance(CREATE_TIMEOUT_MS + 1)
-      clock.runDue()
-    })
+    act(() => fake.advance(CREATE_TIMEOUT_MS + 1))
     await waitFor(() => expect(result.current.failedCreates).toHaveLength(1))
 
     // The original request finally succeeds — the failed row clears.
@@ -641,7 +595,7 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
   })
 
   it('a stale original failure after timeout→Retry does not corrupt the active retry deadline', async () => {
-    const clock = makeFakeClock()
+    const fake = makeFakeClock()
     const client = createTestQueryClient()
     client.setQueryData<Todo[]>(['todos'], [])
     const posts: Array<{
@@ -663,16 +617,13 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
     vi.stubGlobal('fetch', fetchMock)
     const announce = vi.fn()
 
-    const { result } = setup(client, announce, clock)
+    const { result } = setup(client, announce, fake.clock)
     act(() => result.current.submit('retry race'))
     await waitFor(() =>
       expect(client.getQueryData<Todo[]>(['todos'])).toHaveLength(1),
     )
 
-    act(() => {
-      clock.advance(CREATE_TIMEOUT_MS + 1)
-      clock.runDue()
-    })
+    act(() => fake.advance(CREATE_TIMEOUT_MS + 1))
     await waitFor(() => expect(result.current.failedCreates).toHaveLength(1))
     const id = result.current.failedCreates[0]!.id
 
@@ -688,10 +639,7 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
     expect(result.current.pendingIds.has(id)).toBe(true)
     expect(result.current.failedCreates).toHaveLength(0)
 
-    act(() => {
-      clock.advance(CREATE_TIMEOUT_MS + 1)
-      clock.runDue()
-    })
+    act(() => fake.advance(CREATE_TIMEOUT_MS + 1))
 
     await waitFor(() =>
       expect(result.current.failedCreates.map((t) => t.description)).toContain(
@@ -702,7 +650,7 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
   })
 
   it('a stale non-abort failure after Dismiss does not re-add or re-announce the row', async () => {
-    const clock = makeFakeClock()
+    const fake = makeFakeClock()
     const client = createTestQueryClient()
     client.setQueryData<Todo[]>(['todos'], [])
     let resolvePost: ((response: Response) => void) | undefined
@@ -717,15 +665,12 @@ describe('useCreateTodo failed-create recovery (Story 1.9)', () => {
     vi.stubGlobal('fetch', fetchMock)
     const announce = vi.fn()
 
-    const { result } = setup(client, announce, clock)
+    const { result } = setup(client, announce, fake.clock)
     act(() => result.current.submit('dismiss race'))
     await waitFor(() =>
       expect(client.getQueryData<Todo[]>(['todos'])).toHaveLength(1),
     )
-    act(() => {
-      clock.advance(CREATE_TIMEOUT_MS + 1)
-      clock.runDue()
-    })
+    act(() => fake.advance(CREATE_TIMEOUT_MS + 1))
     await waitFor(() => expect(result.current.failedCreates).toHaveLength(1))
     const id = result.current.failedCreates[0]!.id
 

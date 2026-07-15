@@ -1,48 +1,12 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
+import { makeFakeClock } from '../test/fakeClock'
 import {
   DELETE_AUTO_REVERT_MS,
   DELETE_NO_COMMIT_WINDOW_MS,
   useArmedDelete,
 } from './useArmedDelete'
-import { type PendingClock } from './usePendingPresentation'
-
-/*
- * The SAME deterministic injectable clock the honest-pending tests use (copied
- * from usePendingPresentation.test.ts per AC 6 — NOT vi.useFakeTimers). advance()
- * moves virtual time and fires due timers in chronological order.
- */
-function makeFakeClock() {
-  let current = 0
-  let nextId = 1
-  const timers = new Map<number, { fireAt: number; fn: () => void }>()
-
-  const clock: PendingClock = {
-    now: () => current,
-    setTimeout: (fn, ms) => {
-      const id = nextId++
-      timers.set(id, { fireAt: current + ms, fn })
-      return id
-    },
-    clearTimeout: (handle) => {
-      timers.delete(handle as number)
-    },
-  }
-
-  function advance(ms: number) {
-    current += ms
-    const due = [...timers.entries()]
-      .filter(([, t]) => t.fireAt <= current)
-      .sort((a, b) => a[1].fireAt - b[1].fireAt)
-    for (const [id, t] of due) {
-      timers.delete(id)
-      t.fn()
-    }
-  }
-
-  return { clock, advance }
-}
 
 function setup() {
   const fake = makeFakeClock()
