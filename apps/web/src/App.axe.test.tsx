@@ -6,6 +6,7 @@ import * as axeMatchers from 'vitest-axe/matchers'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
+import { CAPTURE_PLACEHOLDER } from './test/appHelpers'
 import { renderWithClient } from './test/queryClient'
 
 expect.extend(axeMatchers)
@@ -113,7 +114,7 @@ describe('App accessibility (axe-core)', () => {
     await screen.findByText('Your list will appear here.')
 
     await user.type(
-      screen.getByPlaceholderText('What do you want to do?'),
+      screen.getByPlaceholderText(CAPTURE_PLACEHOLDER),
       'a failed task',
     )
     await user.keyboard('{Enter}')
@@ -164,7 +165,7 @@ describe('App accessibility (axe-core)', () => {
     await screen.findByText('Your list will appear here.')
 
     await user.type(
-      screen.getByPlaceholderText('What do you want to do?'),
+      screen.getByPlaceholderText(CAPTURE_PLACEHOLDER),
       'A pending task',
     )
     await user.keyboard('{Enter}')
