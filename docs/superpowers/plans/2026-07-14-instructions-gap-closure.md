@@ -188,7 +188,7 @@ docker compose down
 docker compose --profile test up -d app-test
 sleep 5 && curl -s http://localhost:18080/health                # {"status":"ok"}
 curl -s http://localhost:18080/todos                            # [] — no bleed from tlf-data
-docker compose --profile test down                              # tmpfs /data dies with the container; NEVER use -v here (it deletes tlf-data too)
+docker compose --profile test rm -sf app-test                   # stop/remove only app-test; tmpfs /data dies with it
 docker volume inspect tlf_tlf-data >/dev/null && echo tlf-data-intact   # prod volume untouched
 ```
 
@@ -455,7 +455,7 @@ An ephemeral instance for testing (tmpfs storage, port 18080):
 
 ​```bash
 docker compose --profile test up -d app-test
-docker compose --profile test down
+docker compose --profile test rm -sf app-test
 ​```
 
 The container runs as the non-root `node` user, reports liveness via a Docker
@@ -511,6 +511,19 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - **Framework Comparison** success criterion — blank in the brief itself; belongs to a later pathway step. Flagged in the Task 7 sprint-status note.
 - The slow-3G TTI budget miss (uncompressed container assets) — already on record in `docs/k6-latency-signoff.md` with a pending decision; a compression change is a runtime change outside this packaging/documentation plan.
 - CI changes of any kind.
+
+### Review Findings
+
+- [x] [Review][Patch] Bind the default Compose host port to `127.0.0.1`; Keith selected loopback-only exposure for the unauthenticated single-user deployment [docker-compose.yml:17]
+- [x] [Review][Patch] Document that legacy root-owned data volumes are unsupported with the new non-root image; Keith selected an explicit breaking-upgrade boundary rather than an ownership migration [README.md:86]
+- [x] [Review][Patch] Mark the model/MCP claims as Keith-reviewed and add concrete evidence-based "prompts that worked best" guidance; Keith confirmed the existing claims during PR #29 review [docs/ai-integration-log.md:92]
+- [x] [Review][Patch] Correct the security audit's false claim that vulnerable dev dependencies never ship; the runner copies the builder's complete `node_modules`, including the flagged Playwright/ExcelJS/UUID chain [docs/security-review.md:70]
+- [x] [Review][Patch] Replace the documented test teardown command because `docker compose --profile test down` targets the whole `tlf` project and can stop a concurrently running production service [README.md:79]
+- [x] [Review][Patch] Narrow the README's "every response" security-header claim to account for Swagger UI's intentionally looser CSP override [README.md:94]
+- [x] [Review][Patch] Provide a repeatable whole-source API coverage command that exits successfully instead of relying on an expected threshold failure [docs/coverage-report.md:21]
+- [x] [Review][Patch] Stop calling all CI jobs merge-blocking without repository ruleset/branch-protection evidence [README.md:112]
+- [x] [Review][Patch] Make the Docker health probe normalize `PORT` the same way as the application so accepted noncanonical numeric forms cannot produce a false unhealthy state [Dockerfile:65]
+- [x] [Review][Patch] Rephrase the security report's repository-only SQL boundary as a reviewed-tree observation rather than an enforcement guarantee [docs/security-review.md:22]
 
 ## Final verification (after all tasks)
 

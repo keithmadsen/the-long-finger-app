@@ -11,15 +11,16 @@ changes; the API run executes both Vitest projects — unit and integration — 
 
 | Suite | Command | Stmts | Branch | Funcs | Lines |
 | --- | --- | --- | --- | --- | --- |
-| Web (component + hooks, 246 tests) | `npx vitest run --coverage --coverage.include='src/**' --root apps/web` | 95.02% | 90.29% | 96.93% | 96.14% |
-| API (unit + integration, 60 tests) | `npx vitest run --coverage --coverage.include='src/**' --root apps/api` | 78.72% | 72.3% | 85.29% | 79.41% |
+| Web (component + hooks, 246 tests) | `npx vitest run --coverage --coverage.include='src/**' --coverage.exclude='src/**/.gitkeep' --coverage.thresholds.statements=0 --coverage.thresholds.branches=0 --coverage.thresholds.functions=0 --coverage.thresholds.lines=0 --root apps/web` | 95.02% | 90.29% | 96.93% | 96.14% |
+| API (unit + integration, 60 tests) | `npx vitest run --coverage --coverage.include='src/**' --coverage.exclude='src/**/.gitkeep' --coverage.thresholds.statements=0 --coverage.thresholds.branches=0 --coverage.thresholds.functions=0 --coverage.thresholds.lines=0 --root apps/api` | 78.72% | 72.3% | 85.29% | 79.41% |
 
 Verdict vs the 70% target: met for both suites — web clears 70% comfortably on every metric, and
 the API clears it on every metric too, though with less headroom (72.3% branches, 79.41% lines).
 
-Note: the API command exits non-zero because the config's delete-path thresholds (80.01%) apply
-globally once the include is widened — the coverage report above is still complete and correct;
-only the threshold check trips. The whole-src numbers are a snapshot, not a gate.
+The CLI commands override the delete-path thresholds to zero for this whole-source snapshot, so
+an under-80% whole-source result is no longer an expected non-zero exit that callers must ignore.
+The dedicated CI commands below retain the risk-focused thresholds; these whole-source numbers
+are not a gate.
 
 ## Enforced thresholds (CI, story 3.4)
 
