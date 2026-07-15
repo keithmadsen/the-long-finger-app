@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildServer } from '../../src/server.js';
+import { seedTodoRow } from '../fixtures/todo.factory.js';
 import { buildTestApp, type TestApp } from './helpers/build-test-app.js';
 
 describe('walking-skeleton round-trip (real temp-file SQLite)', () => {
@@ -44,25 +45,21 @@ describe('GET /todos read path (canonical, camelCase, no envelope)', () => {
     // Seed with controlled timestamps through the cradle db so the ordering
     // assertion is deterministic (server-stamped inserts could collide on ms).
     const { db } = ctx.app.diContainer.cradle;
-    const insert = db.prepare(
-      `INSERT INTO todos (id, description, completed, created_at, updated_at)
-       VALUES (@id, @description, @completed, @created_at, @updated_at)`,
-    );
-    insert.run({
+    seedTodoRow(db, {
       id: 'completed-newer',
       description: 'Completed newer',
       completed: 1,
       created_at: '2026-06-17T09:00:00.000Z',
       updated_at: '2026-06-17T12:00:00.000Z',
     });
-    insert.run({
+    seedTodoRow(db, {
       id: 'active-older',
       description: 'Active older',
       completed: 0,
       created_at: '2026-06-17T09:00:00.000Z',
       updated_at: '2026-06-17T10:00:00.000Z',
     });
-    insert.run({
+    seedTodoRow(db, {
       id: 'active-newer',
       description: 'Active newer',
       completed: 0,
@@ -337,18 +334,14 @@ describe('PATCH /todos/:id toggle path (Story 1.8 AC 1, 7, 9)', () => {
   // canonical-order and updated_at assertions are deterministic.
   function seed() {
     const { db } = ctx.app.diContainer.cradle;
-    const insert = db.prepare(
-      `INSERT INTO todos (id, description, completed, created_at, updated_at)
-       VALUES (@id, @description, @completed, @created_at, @updated_at)`,
-    );
-    insert.run({
+    seedTodoRow(db, {
       id: 'active-1',
       description: 'Active one',
       completed: 0,
       created_at: '2020-01-01T09:00:00.000Z',
       updated_at: '2020-01-01T09:00:00.000Z',
     });
-    insert.run({
+    seedTodoRow(db, {
       id: 'active-2',
       description: 'Active two',
       completed: 0,
@@ -460,10 +453,7 @@ describe('DELETE /todos/:id (idempotent 204) (Story 2.1)', () => {
 
   function seed() {
     const { db } = ctx.app.diContainer.cradle;
-    db.prepare(
-      `INSERT INTO todos (id, description, completed, created_at, updated_at)
-       VALUES (@id, @description, @completed, @created_at, @updated_at)`,
-    ).run({
+    seedTodoRow(db, {
       id: 'delete-me',
       description: 'Delete me',
       completed: 0,

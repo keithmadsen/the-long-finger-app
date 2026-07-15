@@ -1,47 +1,12 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
+import { makeFakeClock } from '../test/fakeClock'
 import {
   FLICKER_THRESHOLD_MS,
   PENDING_MIN_HOLD_MS,
   usePendingPresentation,
-  type PendingClock,
 } from './usePendingPresentation'
-
-/*
- * A deterministic, injectable clock (the production seam, not vi.useFakeTimers).
- * advance() moves virtual time and fires any due timers in chronological order.
- */
-function makeFakeClock() {
-  let current = 0
-  let nextId = 1
-  const timers = new Map<number, { fireAt: number; fn: () => void }>()
-
-  const clock: PendingClock = {
-    now: () => current,
-    setTimeout: (fn, ms) => {
-      const id = nextId++
-      timers.set(id, { fireAt: current + ms, fn })
-      return id
-    },
-    clearTimeout: (handle) => {
-      timers.delete(handle as number)
-    },
-  }
-
-  function advance(ms: number) {
-    current += ms
-    const due = [...timers.entries()]
-      .filter(([, t]) => t.fireAt <= current)
-      .sort((a, b) => a[1].fireAt - b[1].fireAt)
-    for (const [id, t] of due) {
-      timers.delete(id)
-      t.fn()
-    }
-  }
-
-  return { clock, advance }
-}
 
 function setup(initialPending: boolean, prefersReducedMotion?: () => boolean) {
   const fake = makeFakeClock()
