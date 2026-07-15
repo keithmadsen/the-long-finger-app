@@ -1,0 +1,37 @@
+# Orchestration for the single production image (Fastify serves API + built SPA
+# from one origin — see Dockerfile). Two services, one image:
+#
+#   docker compose up -d                    # prod-shaped: persistent tlf-data volume
+#   docker compose --profile test up -d app-test   # test: ephemeral tmpfs /data
+#
+# Env config (brief Step 3 "Environment Config"): PORT / TEST_PORT pick the host
+# port per environment; in-container the app always listens on 8080 and writes
+# SQLite to /data/todos.db (set via ENV in the Dockerfile).
+name: tlf
+
+services:
+  app:
+    build: .
+    image: tlf-app
+    ports:
+      - "${PORT:-8080}:8080"
+    volumes:
+      - tlf-data:/data
+    restart: unless-stopped
+
+  app-test:
+    profiles: ["test"]
+    build: .
+    image: tlf-app
+    ports:
+      - "${TEST_PORT:-18080}:8080"
+    # Ephemeral tmpfs /data, node-owned via inline uid/gid (a bare tmpfs mounts
+    # root-owned and the app runs as the non-root node user; the compose-spec
+    # long form accepts only size/mode, so inline options are the only way to
+    # get ownership). Dies with the container, so no `-v` teardown is ever
+    # needed — compose `down -v` would also delete tlf-data.
+    tmpfs:
+      - /data:uid=1000,gid=1000
+
+volumes:
+  tlf-data:

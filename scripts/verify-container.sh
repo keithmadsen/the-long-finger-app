@@ -64,6 +64,21 @@ log "wait for /health (liveness probe, AC 5)"
 wait_health
 echo "health: 200 OK"
 
+log "container runs as non-root (brief Step 3: non-root users)"
+CONTAINER_UID=$(docker exec "$CONTAINER" id -u)
+[ "$CONTAINER_UID" = "1000" ] || fail "container running as uid $CONTAINER_UID, wanted 1000 (node)"
+echo "uid: $CONTAINER_UID (node)"
+
+log "Docker HEALTHCHECK reports healthy (brief Step 3: health checks)"
+deadline=$(( $(date +%s) + 60 ))
+while :; do
+  HSTATUS=$(docker inspect --format '{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo none)
+  [ "$HSTATUS" = "healthy" ] && break
+  [ "$(date +%s)" -gt "$deadline" ] && fail "health status '$HSTATUS' not healthy within 60s"
+  sleep 1
+done
+echo "healthcheck: healthy"
+
 log "strict CSP served by the container (AC 1 spot-check)"
 CSP=$(http -I "$BASE/" | tr -d '\r' | grep -i '^content-security-policy:' || true)
 echo "$CSP"
