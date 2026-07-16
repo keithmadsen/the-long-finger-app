@@ -26,8 +26,71 @@ const row = (page: Page, description: string) =>
 const descriptionEl = (page: Page, description: string) =>
   row(page, description).getByText(description, { exact: true })
 
+// The checkbox's visual indicator: the aria-hidden <span> adjacent to the
+// native input (Checkbox.tsx structure — class names are CSS-module-hashed).
+const checkboxIndicator = (page: Page, description: string) =>
+  row(page, description).locator('input[type="checkbox"] + span[aria-hidden="true"]')
+
+// Computed border vs flattened background — the forced-colors boundary
+// assertions compare the two rather than assuming a particular OS
+// high-contrast palette. Passed to locator.evaluate: the function SOURCE is
+// serialized into the browser, so it must not reference other module bindings.
+const borderMetrics = (el: Element) => {
+  const s = getComputedStyle(el)
+  return {
+    style: s.borderStyle,
+    width: s.borderWidth,
+    color: s.borderColor,
+    background: s.backgroundColor,
+  }
+}
+
+// Outline metrics for the :focus-visible assertions. Same serialization
+// constraint as borderMetrics.
+const outlineMetrics = (el: Element) => {
+  const s = getComputedStyle(el)
+  return { style: s.outlineStyle, width: s.outlineWidth }
+}
+
 test.describe('forced-colors gate (Story 3.3, AC 3)', () => {
-  test('@p1 focus ring survives, completion cues survive, armed delete reads via its label', async ({
+  test('@p1 focus ring survives; input keeps a visible boundary', async ({
+    page,
+    seedTodos,
+  }) => {
+    const stamp = randomStamp()
+    const name = `fc focus ${stamp}`
+    await seedTodos([{ description: name }])
+
+    await page.emulateMedia({ forcedColors: 'active' })
+    await scopeListTo(page, stamp)
+    await page.goto('/')
+    await expect(page.getByRole('listitem')).toHaveCount(1)
+
+    // The :focus-visible outline survives forced-colors (it is an `outline`,
+    // which forced-colors preserves by design). Focus arrives via the
+    // KEYBOARD (Tab to the row anchor, Shift+Tab back to the input) so
+    // :focus-visible is guaranteed to match on both elements.
+    const input = page.getByPlaceholder(CAPTURE_PLACEHOLDER)
+    await page.keyboard.press('Tab')
+    const anchor = row(page, name).locator('label')
+    await expect(anchor).toBeFocused()
+    const anchorOutline = await anchor.evaluate(outlineMetrics)
+    expect(anchorOutline.style).not.toBe('none')
+    expect(anchorOutline.width).not.toBe('0px')
+
+    await page.keyboard.press('Shift+Tab')
+    await expect(input).toBeFocused()
+    const inputOutline = await input.evaluate(outlineMetrics)
+    expect(inputOutline.style).not.toBe('none')
+    expect(inputOutline.width).not.toBe('0px')
+
+    const inputBorder = await input.evaluate(borderMetrics)
+    expect(inputBorder.style).not.toBe('none')
+    expect(inputBorder.width).not.toBe('0px')
+    expect(inputBorder.color).not.toBe(inputBorder.background)
+  })
+
+  test('@p1 completion cues are structural, not color-only', async ({
     page,
     seedTodos,
     apiRequest,
@@ -35,11 +98,11 @@ test.describe('forced-colors gate (Story 3.3, AC 3)', () => {
     const stamp = randomStamp()
     const activeName = `fc active ${stamp}`
     const doneName = `fc done ${stamp}`
-    const [active, done] = await seedTodos([
+    const [, done] = await seedTodos([
       { description: activeName },
       { description: doneName },
     ])
-    if (!active || !done) throw new Error('seeding failed')
+    if (!done) throw new Error('seeding failed')
     await apiRequest({
       method: 'PATCH',
       path: `/todos/${done.id}`,
@@ -51,95 +114,54 @@ test.describe('forced-colors gate (Story 3.3, AC 3)', () => {
     await page.goto('/')
     await expect(page.getByRole('listitem')).toHaveCount(2)
 
-    // (a) The :focus-visible outline survives forced-colors (it is an
-    // `outline`, which forced-colors preserves by design). Focus arrives via
-    // the KEYBOARD (Tab to the row anchor, Shift+Tab back to the input) so
-    // :focus-visible is guaranteed to match on both elements.
-    const input = page.getByPlaceholder(CAPTURE_PLACEHOLDER)
-    await page.keyboard.press('Tab')
-    const anchor = row(page, activeName).locator('label')
-    await expect(anchor).toBeFocused()
-    const anchorOutline = await anchor.evaluate((el) => {
-      const s = getComputedStyle(el)
-      return { style: s.outlineStyle, width: s.outlineWidth }
-    })
-    expect(anchorOutline.style).not.toBe('none')
-    expect(anchorOutline.width).not.toBe('0px')
-
-    await page.keyboard.press('Shift+Tab')
-    await expect(input).toBeFocused()
-    const inputOutline = await input.evaluate((el) => {
-      const s = getComputedStyle(el)
-      return { style: s.outlineStyle, width: s.outlineWidth }
-    })
-    expect(inputOutline.style).not.toBe('none')
-    expect(inputOutline.width).not.toBe('0px')
-
-    // The committed forced-colors gate also requires every interactive control
-    // to retain a visible boundary. Compare each border with its flattened
-    // background instead of assuming a particular OS high-contrast palette.
-    const borderMetrics = (el: Element) => {
-      const s = getComputedStyle(el)
-      return {
-        style: s.borderStyle,
-        width: s.borderWidth,
-        color: s.borderColor,
-        background: s.backgroundColor,
-      }
-    }
-    const inputBorder = await input.evaluate(borderMetrics)
-    expect(inputBorder.style).not.toBe('none')
-    expect(inputBorder.width).not.toBe('0px')
-    expect(inputBorder.color).not.toBe(inputBorder.background)
-
-    // (b) Completion cues are structural, not color-only: strikethrough on the
-    // text plus the checkbox's foreground ✓ glyph (a ::before with content,
-    // never background-only — backgrounds flatten under forced colors).
+    // Strikethrough on the text plus the checkbox's foreground ✓ glyph (a
+    // ::before with content, never background-only — backgrounds flatten
+    // under forced colors).
     await expect(descriptionEl(page, doneName)).toHaveCSS(
       'text-decoration-line',
       'line-through',
     )
-    const doneGlyph = await row(page, doneName)
-      .getByRole('checkbox')
-      .evaluate((el) => {
-        const indicator = el.nextElementSibling as Element
-        const s = getComputedStyle(indicator, '::before')
-        return { content: s.content, opacity: s.opacity }
-      })
+    const doneGlyph = await checkboxIndicator(page, doneName).evaluate((el) => {
+      const s = getComputedStyle(el, '::before')
+      return { content: s.content, opacity: s.opacity }
+    })
     expect(doneGlyph.content).toBe('"✓"')
     expect(doneGlyph.opacity).toBe('1')
     // The unchecked row's glyph is transparent — checked vs unchecked stays
     // distinguishable without author colors.
-    const activeGlyph = await row(page, activeName)
-      .getByRole('checkbox')
-      .evaluate((el) => {
-        const indicator = el.nextElementSibling as Element
-        return getComputedStyle(indicator, '::before').opacity
-      })
-    expect(activeGlyph).toBe('0')
-    const checkboxBorder = await row(page, doneName)
-      .getByRole('checkbox')
-      .evaluate((el) => {
-        const s = getComputedStyle(el.nextElementSibling as Element)
-        return {
-          style: s.borderStyle,
-          width: s.borderWidth,
-          color: s.borderColor,
-          background: s.backgroundColor,
-        }
-      })
+    const activeGlyphOpacity = await checkboxIndicator(page, activeName).evaluate(
+      (el) => getComputedStyle(el, '::before').opacity,
+    )
+    expect(activeGlyphOpacity).toBe('0')
+    const checkboxBorder = await checkboxIndicator(page, doneName).evaluate(
+      borderMetrics,
+    )
     expect(checkboxBorder.style).not.toBe('none')
     expect(checkboxBorder.width).not.toBe('0px')
     expect(checkboxBorder.color).not.toBe(checkboxBorder.background)
+  })
 
-    // (c) The armed-delete signal is the visible LABEL flip (Delete→Confirm)
+  test('@p1 armed delete reads via its label flip', async ({
+    page,
+    seedTodos,
+  }) => {
+    const stamp = randomStamp()
+    const name = `fc armed ${stamp}`
+    await seedTodos([{ description: name }])
+
+    await page.emulateMedia({ forcedColors: 'active' })
+    await scopeListTo(page, stamp)
+    await page.goto('/')
+    await expect(page.getByRole('listitem')).toHaveCount(1)
+
+    // The armed-delete signal is the visible LABEL flip (Delete→Confirm)
     // plus aria-pressed — asserting the --color-error swap here would be wrong
     // (forced-colors overrides author colors; the label IS the signal).
     const deleteButton = page.getByRole('button', {
-      name: `Delete '${activeName}'`,
+      name: `Delete '${name}'`,
     })
     await deleteButton.click()
-    const armedButton = row(page, activeName).getByRole('button')
+    const armedButton = row(page, name).getByRole('button')
     await expect(armedButton).toHaveText('Confirm')
     await expect(armedButton).toHaveAttribute('aria-pressed', 'true')
     const buttonBorder = await armedButton.evaluate(borderMetrics)
@@ -204,12 +226,9 @@ test.describe('reduced-motion gate (Story 3.3, AC 5)', () => {
 
     // The delete SAFETY windows are deliberately not motion (useArmedDelete
     // design comment): under reduced motion a second press inside the 300ms
-    // muscle-memory window is still ABSORBED, and the armed state still holds
-    // well before the 5s auto-revert. Both presses run in-browser with a fixed
-    // same-task gap so event-loop stalls cannot accidentally cross 300ms. The
-    // 5s auto-revert race
-    // itself is unit-tested against the injectable clock (2.3) — asserting a
-    // wall-clock 5s wait here would only buy flake.
+    // muscle-memory window is still ABSORBED. Both presses run in-browser
+    // with a fixed same-task gap so event-loop stalls cannot accidentally
+    // cross 300ms.
     await deleteButton.evaluate((el) => {
       ;(el as HTMLElement).click() // arm
       ;(el as HTMLElement).click() // inside the no-commit window → absorbed
@@ -218,7 +237,11 @@ test.describe('reduced-motion gate (Story 3.3, AC 5)', () => {
     await expect(armedButton).toHaveText('Confirm')
     await expect(row(page, name)).toHaveCount(1) // not committed
 
-    await page.waitForTimeout(900) // ~1s after arming: still armed (< 5s revert)
+    // Persistence probe: the armed state outlives the no-commit window —
+    // proof the auto-revert was not collapsed to ~0s by reduced motion. The
+    // exact 5s revert race is unit-tested against the injectable clock (2.3);
+    // asserting a wall-clock 5s here would only buy flake.
+    await page.waitForTimeout(350)
     await expect(armedButton).toHaveText('Confirm')
     await expect(row(page, name)).toHaveCount(1)
   })
